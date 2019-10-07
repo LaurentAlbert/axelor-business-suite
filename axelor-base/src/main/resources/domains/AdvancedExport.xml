@@ -12,6 +12,10 @@
   	 <integer name="maxExportLimit" title="Maximum export limit" default="1000" help="Maximum number of records to export by using this advance export."/>
   	 <integer name="queryFetchSize" title="Query fetch size" default="100" 
   	 	help="Number of records to fetch from database on one query run. It will fetch upto 'Maximum export limit'."/>
+        <boolean name="generateHeader" title="Generate Header" default="true"
+                help="Generate header"/>
+	<boolean name="noQuote" title="Suppress all quoting" default="false"
+		help="Suppress all quoting"/>
   </entity>
   
 </domain-models>

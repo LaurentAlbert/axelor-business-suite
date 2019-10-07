@@ -47,7 +47,10 @@ public class CsvExportGenerator extends AdvancedExportGenerator {
     exportFileName = advancedExport.getMetaModel().getName() + ".csv";
     try {
       exportFile = File.createTempFile(advancedExport.getMetaModel().getName(), ".csv");
-      csvWriter = new CSVWriter(new FileWriter(exportFile, true), ';');
+      if (advancedExport.getNoQuote())
+        csvWriter = new CSVWriter(new FileWriter(exportFile, true), ';', CSVWriter.NO_QUOTE_CHARACTER);
+      else
+        csvWriter = new CSVWriter(new FileWriter(exportFile, true), ';');
     } catch (IOException e) {
       TraceBackService.trace(e);
       throw new AxelorException(e, TraceBackRepository.CATEGORY_CONFIGURATION_ERROR);
