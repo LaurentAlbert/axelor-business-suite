@@ -48,7 +48,7 @@ public class CsvExportGenerator extends AdvancedExportGenerator {
     try {
       exportFile = File.createTempFile(advancedExport.getMetaModel().getName(), ".csv");
       if (advancedExport.getNoQuote())
-        csvWriter = new CSVWriter(new FileWriter(exportFile, true), ';', CSVWriter.NO_QUOTE_CHARACTER);
+        csvWriter = new CSVWriter(new FileWriter(exportFile, true), ';', CSVWriter.NO_QUOTE_CHARACTER,"\r\n");       
       else
         csvWriter = new CSVWriter(new FileWriter(exportFile, true), ';');
     } catch (IOException e) {
