@@ -145,43 +145,12 @@
         <field name="name" />
     </calendar>
     
-    <form name="stock-move-customer-deliveries-form" title="Customer delivery" model="com.axelor.apps.stock.db.StockMove" width="large"
-					onLoad="action-group-stock-stockmove-onload" onNew="action-group-stock-stockmove-onnew" onSave="save,action-stock-move-method-update-stocks">
-					<toolbar>
-						<button name="refreshProductNetMassBtn" title="Refresh the products net mass" onClick="action-stock-move-method-refresh-net-mass"/>
-					</toolbar>
-    	<panel-include view="stock-move-form"/>
-	</form>
-	
-	<form name="stock-move-customer-returns-form" title="Customer return" model="com.axelor.apps.stock.db.StockMove" width="large"
-					onLoad="action-group-stock-stockmove-onload" onNew="action-group-stock-stockmove-onnew" onSave="save,action-stock-move-method-update-stocks">
-    	<panel-include view="stock-move-form"/>
-	</form>
-	
-	<form name="stock-move-supplier-returns-form" title="Supplier return" model="com.axelor.apps.stock.db.StockMove" width="large"
-					onLoad="action-group-stock-stockmove-onload" onNew="action-group-stock-stockmove-onnew" onSave="save,action-stock-move-method-update-stocks">
-    	<panel-include view="stock-move-form"/>
-	</form>
-	
-	<form name="stock-move-internal-move-form" title="Internal Stock Move" model="com.axelor.apps.stock.db.StockMove" width="large"
-					onLoad="action-group-stock-stockmove-onload" onNew="action-group-stock-stockmove-onnew" onSave="save,action-stock-move-method-update-stocks">
-    	<panel-include view="stock-move-form"/>
-	</form>
-	
-	
-	<form name="stock-move-availability-requests-form" title="Availability request" model="com.axelor.apps.stock.db.StockMove" width="large"
-					onLoad="action-group-stock-stockmove-onload" onNew="action-group-stock-stockmove-onnew" onSave="save,action-stock-move-method-update-stocks">
-    	<panel-include view="stock-move-form"/>
-	</form>
-       
-       
-	<form name="stock-move-supplier-arrivals-form" title="Supplier Arrival" model="com.axelor.apps.stock.db.StockMove" width="large"
-					onLoad="action-group-stock-stockmove-onload" onNew="action-group-stock-stockmove-onnew" onSave="save,action-stock-move-method-update-stocks">
-    	<panel-include view="stock-move-form"/>
-	</form>
 
     <form name="stock-move-form" title="Stock move" model="com.axelor.apps.stock.db.StockMove" width="large"
 					onLoad="action-group-stock-stockmove-onload" onNew="action-group-stock-stockmove-onnew" onSave="save,action-stock-move-method-update-stocks">
+		<toolbar>
+			<button showIf="typeSelect == 2 &amp;&amp; !isReversion" name="refreshProductNetMassBtn" title="Refresh the products net mass" onClick="action-stock-move-method-refresh-net-mass"/>
+		</toolbar>
         <menubar>
             <menu title="Reports" icon="fa-files-o">
                 <item title="Print Internal Move" action="save,action-print-stock-move" readonlyIf="statusSelect == 1" showIf="typeSelect == 1"/>
@@ -309,6 +278,7 @@
                 </field>
 
                 <field name="toAddress" showIf="!$readonly() &amp;&amp; statusSelect &lt; 3 &amp;&amp; typeSelect == 2" onSelect="action-stock-move-attrs-domain-address" onChange="action-stock-move-method-set-addresses-str,action-stock-move-record-ispm-field" readonlyIf="statusSelect == 3 || statusSelect == 4" form-view="address-partner-address-form"/>
+               <static name="deliveryAddressText" hidden="true" colSpan="12"><![CDATA[<span class='label label-warning'>Warning : Delivery address is missing.</span>]]></static>
                 <field name="toAddressStr" showIf="typeSelect == 2" readonlyIf="statusSelect &gt; 2" height="3">
                     <viewer>{{record.toAddressStr}}</viewer>
                 </field>
@@ -553,6 +523,7 @@
         <action name="action-stock-move-attrs-set-required-shipment-supplier-details"/>
 		<action name="action-stock-move-attrs-filter-on-available-products"/>
 		<action name="action-supplychain-stock-move-record-set-invoice-status"/>
+		<action name="action-stock-move-attrs-check-delivery-address"/>
     </action-group>
     
     <action-group name="action-stock-move-line-change-group">
@@ -599,6 +570,7 @@
         <action name="action-stock-move-record-auto-mail"/>
 		<action name="action-stock-move-record-ispm-field"/>
 	   	<action name="action-stock-move-record-partner-shipment-informations"/>
+	   	<action name="action-stock-move-attrs-check-delivery-address"/>
 	</action-group>
 
     <action-group name="action-stock-move-group-onchange-company">
@@ -948,6 +920,10 @@
 		<field name="carrierPartner" expr="eval: clientPartner?.freightCarrierMode?.carrierPartner"/>
 	</action-record>
 	
+	<action-attrs name="action-stock-move-attrs-check-delivery-address">
+		<attribute name="hidden" for="deliveryAddressText" expr="eval: partner?.partnerAddressList?.findAll{it.isDeliveryAddr}?.size() &gt; 0 " /> 
+    </action-attrs>
+    
 	<action-group name="action-group-stock-stockmove-cancel-click">
 		<action name="save"/>
 		<action name="action-validate-stock-move-validate-cancel"/>
