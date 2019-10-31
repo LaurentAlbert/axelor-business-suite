@@ -23,9 +23,6 @@
 				onLoad="action-team-task-group-timer-process" width="large">
 		<toolbar>
 			<button name="grabEventBtn" icon="fa-suitcase" help="Take charge" onClick="action-team-task-record-assigned-yourself,save"/>
-			<button name="startBtn" icon="fa-play" onClick="action-team-task-record-status-in-progress,save"/>
-			<button name="acceptBtn" icon="fa-check" onClick="action-team-task-record-status-closed,save"/>
-			<button name="stopBtn" icon="fa-power-off" onClick="action-team-task-record-status-canceled,save"/>
 		</toolbar>
 		<menubar>
 	        <menu title="Tools">   
@@ -55,7 +52,6 @@
 					</viewer>
 				</field>
 			</panel>
-			<button name="timeSpentBtn" title="Enter Time spent" onClick="save,action-team-task-view-time-spent" colSpan="2"/>
 			<field name="$provider" hidden="true" type="string"/>
 			<panel name="projectDetailsPanel" colSpan="12">
 				<panel name="detailsPanel" colSpan="8">
@@ -157,6 +153,7 @@
 				<field name="teamTaskInvoicing" colSpan="3" onChange="action-team-task-record-set-invoicing-type" if="__config__.app.isApp('business-project')" if-module="axelor-business-project"/>
 				<field name="invoicingType" colspan="6" if="__config__.app.isApp('business-project')" if-module="axelor-business-project" showIf="teamTaskInvoicing" onChange="action-team-task-attrs-to-invoice"/>
 				<field name="isPaid" showIf="project.invoicingSequenceSelect == 1" if="__config__.app.isApp('business-project')" if-module="axelor-business-project" colSpan="3"/>
+				<field name="project.invoicingSequenceSelect" hidden="true"/>
 				<field name="saleOrderLine" readonly="true" showIf="saleOrderLine" form-view="sale-order-line-form" grid-view="sale-order-line-grid"/>
 				<field name="invoiceLine" readonly="true" showIf="invoiceLine" form-view="invoice-line-form" grid-view="invoice-line-grid"/>
 				<panel name="packagePanel" title="Package" colSpan="12" showIf="invoicingType == 2">
@@ -209,6 +206,12 @@
 				</panel>
 			</panel>
 		</panel-tabs>
+		<panel name="actionsPanel" colSpan="2" sidebar="true">
+			<button name="timeSpentBtn" title="Enter Time spent" onClick="save,action-team-task-view-time-spent" colSpan="12"/>
+			<button name="startBtn" title="Start" icon="fa-play" onClick="action-team-task-record-status-in-progress,save" colSpan="12"/>
+			<button name="acceptBtn" title ="Close" icon="fa-check" onClick="action-team-task-record-status-closed,save" colSpan="12"/>
+			<button name="stopBtn" title ="Cancel" icon="fa-power-off" onClick="action-team-task-record-status-canceled,save" colSpan="12"/>
+		</panel>
 		<panel-mail name="mailPanel">
 			<mail-messages/>
 			<mail-followers/>
