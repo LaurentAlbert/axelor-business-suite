@@ -820,7 +820,7 @@
 
 	<action-attrs name="action-partner-attrs-hide-employee-panel">
 		<attribute name="hidden" for="employeePanel"
-		expr="eval:!( __this__.employee != null &amp;&amp; __user__.employee != null  &amp;&amp;
+		expr="eval:!(__config__.app.getApp('employee') &amp;&amp; __this__.employee != null &amp;&amp; __user__.employee != null  &amp;&amp;
 		(__user__.employee.hrManager &amp;&amp;  __user__ == __this__.employee.managerUser))"/>
 	</action-attrs>
 
