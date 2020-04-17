@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -108,8 +108,7 @@ public class DepositSlipServiceImpl implements DepositSlipService {
     if (depositSlip.getPaymentVoucherList() != null) {
       List<PaymentVoucher> paymentVoucherList = depositSlip.getPaymentVoucherList();
       BigDecimal totalAmount =
-          paymentVoucherList
-              .stream()
+          paymentVoucherList.stream()
               .map(PaymentVoucher::getPaidAmount)
               .reduce(BigDecimal.ZERO, BigDecimal::add);
       depositSlip.setTotalAmount(totalAmount);

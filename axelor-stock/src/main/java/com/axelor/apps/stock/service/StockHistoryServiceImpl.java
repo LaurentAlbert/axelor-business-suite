@@ -1,6 +1,24 @@
+/*
+ * Axelor Business Solutions
+ *
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
+ *
+ * This program is free software: you can redistribute it and/or  modify
+ * it under the terms of the GNU Affero General Public License, version 3,
+ * as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 package com.axelor.apps.stock.service;
 
 import com.axelor.apps.base.service.UnitConversionService;
+import com.axelor.apps.base.service.app.AppBaseService;
 import com.axelor.apps.stock.db.StockHistoryLine;
 import com.axelor.apps.stock.db.StockMoveLine;
 import com.axelor.apps.stock.db.repo.StockMoveLineRepository;
@@ -8,6 +26,7 @@ import com.axelor.apps.stock.db.repo.StockMoveRepository;
 import com.axelor.db.JPA;
 import com.axelor.exception.AxelorException;
 import com.axelor.i18n.I18n;
+import com.axelor.inject.Beans;
 import com.google.inject.Inject;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -131,8 +150,7 @@ public class StockHistoryServiceImpl implements StockHistoryService {
     }
     stockHistoryLine.setSumIncQtyPeriod(sumIncQtyPeriod);
     stockHistoryLine.setPriceIncStockMovePeriod(
-        stockMoveLineList
-            .stream()
+        stockMoveLineList.stream()
             .map(StockMoveLine::getCompanyUnitPriceUntaxed)
             .reduce(BigDecimal::add)
             .orElse(BigDecimal.ZERO));
@@ -159,8 +177,7 @@ public class StockHistoryServiceImpl implements StockHistoryService {
     }
     stockHistoryLine.setSumOutQtyPeriod(sumOutQtyPeriod);
     stockHistoryLine.setPriceOutStockMovePeriod(
-        stockMoveLineList
-            .stream()
+        stockMoveLineList.stream()
             .map(StockMoveLine::getCompanyUnitPriceUntaxed)
             .reduce(BigDecimal::add)
             .orElse(BigDecimal.ZERO));
@@ -178,8 +195,7 @@ public class StockHistoryServiceImpl implements StockHistoryService {
     stockHistoryLine.setLabel(I18n.get("Total"));
 
     Integer countIncMvtStock =
-        stockHistoryLineList
-            .stream()
+        stockHistoryLineList.stream()
             .map(StockHistoryLine::getCountIncMvtStockPeriod)
             .filter(Objects::nonNull)
             .mapToInt(Integer::intValue)
@@ -187,8 +203,7 @@ public class StockHistoryServiceImpl implements StockHistoryService {
     stockHistoryLine.setCountIncMvtStockPeriod(countIncMvtStock);
 
     BigDecimal sumIncQtyPeriod =
-        stockHistoryLineList
-            .stream()
+        stockHistoryLineList.stream()
             .map(StockHistoryLine::getSumIncQtyPeriod)
             .filter(Objects::nonNull)
             .reduce(BigDecimal::add)
@@ -196,8 +211,7 @@ public class StockHistoryServiceImpl implements StockHistoryService {
     stockHistoryLine.setSumIncQtyPeriod(sumIncQtyPeriod);
 
     BigDecimal priceIncStockMove =
-        stockHistoryLineList
-            .stream()
+        stockHistoryLineList.stream()
             .map(StockHistoryLine::getPriceIncStockMovePeriod)
             .filter(Objects::nonNull)
             .reduce(BigDecimal::add)
@@ -205,8 +219,7 @@ public class StockHistoryServiceImpl implements StockHistoryService {
     stockHistoryLine.setPriceIncStockMovePeriod(priceIncStockMove);
 
     Integer countOutMvtStock =
-        stockHistoryLineList
-            .stream()
+        stockHistoryLineList.stream()
             .map(StockHistoryLine::getCountOutMvtStockPeriod)
             .filter(Objects::nonNull)
             .mapToInt(Integer::intValue)
@@ -214,8 +227,7 @@ public class StockHistoryServiceImpl implements StockHistoryService {
     stockHistoryLine.setCountOutMvtStockPeriod(countOutMvtStock);
 
     BigDecimal sumOutQtyPeriod =
-        stockHistoryLineList
-            .stream()
+        stockHistoryLineList.stream()
             .map(StockHistoryLine::getSumOutQtyPeriod)
             .filter(Objects::nonNull)
             .reduce(BigDecimal::add)
@@ -223,8 +235,7 @@ public class StockHistoryServiceImpl implements StockHistoryService {
     stockHistoryLine.setSumOutQtyPeriod(sumOutQtyPeriod);
 
     BigDecimal priceOutStockMove =
-        stockHistoryLineList
-            .stream()
+        stockHistoryLineList.stream()
             .map(StockHistoryLine::getPriceOutStockMovePeriod)
             .filter(Objects::nonNull)
             .reduce(BigDecimal::add)
@@ -246,6 +257,8 @@ public class StockHistoryServiceImpl implements StockHistoryService {
     StockHistoryLine stockHistoryLine = new StockHistoryLine();
     stockHistoryLine.setLabel(I18n.get("Average"));
 
+    int qtyScale = Beans.get(AppBaseService.class).getAppBase().getNbDecimalDigitForQty();
+
     int sizeOfList = stockHistoryLineList.size();
     if (sizeOfList == 0) {
       return stockHistoryLine;
@@ -257,7 +270,7 @@ public class StockHistoryServiceImpl implements StockHistoryService {
     stockHistoryLine.setSumIncQtyPeriod(
         totalStockHistoryLine
             .getSumIncQtyPeriod()
-            .divide(BigDecimal.valueOf(sizeOfList), 2, RoundingMode.HALF_EVEN));
+            .divide(BigDecimal.valueOf(sizeOfList), qtyScale, RoundingMode.HALF_EVEN));
 
     stockHistoryLine.setPriceIncStockMovePeriod(
         totalStockHistoryLine
@@ -270,7 +283,7 @@ public class StockHistoryServiceImpl implements StockHistoryService {
     stockHistoryLine.setSumOutQtyPeriod(
         totalStockHistoryLine
             .getSumOutQtyPeriod()
-            .divide(BigDecimal.valueOf(sizeOfList), 2, RoundingMode.HALF_EVEN));
+            .divide(BigDecimal.valueOf(sizeOfList), qtyScale, RoundingMode.HALF_EVEN));
 
     stockHistoryLine.setPriceOutStockMovePeriod(
         totalStockHistoryLine

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <object-views xmlns="http://axelor.com/xml/ns/object-views"
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://axelor.com/xml/ns/object-views http://axelor.com/xml/ns/object-views/object-views_5.1.xsd">
+	xsi:schemaLocation="http://axelor.com/xml/ns/object-views http://axelor.com/xml/ns/object-views/object-views_5.2.xsd">
     
 	<grid name="account-grid" title="Accounting.Accounts" model="com.axelor.apps.account.db.Account">
 	  <field name="code" x-bind="{{code|unaccent|uppercase}}"/>
@@ -36,7 +36,7 @@
     </tree>
 
 	<form name="account-form" title="Accounting.Account" model="com.axelor.apps.account.db.Account" width="large"
-		onNew="action-account-record-new" onLoad="action-account-method-compute-balance">
+		onNew="action-account-record-new" onLoad="action-account-method-compute-balance" onSave="action-account-method-check-if-code-already-exist-for-company">
 		<panel name="mainPanel">
 			<panel name="accountDetailsPanel" colSpan="8">
 				<field name="code" x-bind="{{code|unaccent|uppercase}}" colSpan="3" css="bold"/>
@@ -154,6 +154,10 @@
     
     <action-method name="action-account-method-compute-balance">
     	<call class="com.axelor.apps.account.web.AccountController" method="computeBalance"/>
+    </action-method>
+    
+    <action-method name="action-account-method-check-if-code-already-exist-for-company">
+    	<call class="com.axelor.apps.account.web.AccountController" method="checkIfCodeAccountAlreadyExistForCompany"/>
     </action-method>
     
 </object-views>

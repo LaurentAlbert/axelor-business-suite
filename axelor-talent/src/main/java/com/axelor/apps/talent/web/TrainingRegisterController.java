@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -91,13 +91,14 @@ public class TrainingRegisterController {
       trainingSaved = trainingRegisterSaved.getTraining();
     }
 
-    if (trainingSaved != null && trainingSaved.getId() != trainingRegister.getTraining().getId()) {
+    if (trainingSaved != null
+        && trainingSaved.getId().equals(trainingRegister.getTraining().getId())) {
       trainingRegisterService.updateTrainingRating(trainingSaved, trainingRegister.getId());
     }
 
     if (trainingSessionSaved != null) {
       if (trainingRegister.getTrainingSession() == null
-          || trainingRegister.getTrainingSession().getId() != trainingSessionSaved.getId()) {
+          || trainingRegister.getTrainingSession().getId().equals(trainingSessionSaved.getId())) {
         trainingRegisterService.updateSessionRating(trainingSessionSaved, trainingRegister.getId());
       }
     }

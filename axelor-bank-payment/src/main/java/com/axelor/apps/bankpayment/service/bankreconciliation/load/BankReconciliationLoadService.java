@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -78,14 +78,14 @@ public class BankReconciliationLoadService {
       boolean includeOtherBankStatements, boolean includeBankStatement) {
 
     String filter;
-    if (!includeOtherBankStatements) {
+    if (!includeOtherBankStatements && includeBankStatement) {
       filter =
           "self.bankDetails = :bankDetails"
               + " and self.currency = :currency"
               + " and self.amountRemainToReconcile > 0"
               + " and self.bankStatement.statusSelect = :statusImported"
               + " and self.bankStatement = :bankStatement";
-    } else if (includeBankStatement) {
+    } else if (includeOtherBankStatements && includeBankStatement) {
       filter =
           "self.bankDetails = :bankDetails"
               + " and self.currency = :currency"

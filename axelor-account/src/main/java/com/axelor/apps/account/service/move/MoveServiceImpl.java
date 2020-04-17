@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -518,8 +518,7 @@ public class MoveServiceImpl implements MoveService {
 
   @Override
   public MoveLine findMoveLineByAccount(Move move, Account account) throws AxelorException {
-    return move.getMoveLineList()
-        .stream()
+    return move.getMoveLineList().stream()
         .filter(moveLine -> moveLine.getAccount().equals(account))
         .findFirst()
         .orElseThrow(
@@ -542,15 +541,13 @@ public class MoveServiceImpl implements MoveService {
     values.put("$totalLines", move.getMoveLineList().size());
 
     BigDecimal totalDebit =
-        move.getMoveLineList()
-            .stream()
+        move.getMoveLineList().stream()
             .map(MoveLine::getDebit)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
     values.put("$totalDebit", totalDebit);
 
     BigDecimal totalCredit =
-        move.getMoveLineList()
-            .stream()
+        move.getMoveLineList().stream()
             .map(MoveLine::getCredit)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
     values.put("$totalCredit", totalCredit);

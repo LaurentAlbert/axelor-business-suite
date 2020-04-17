@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -84,7 +84,8 @@ public class ProjectGeneratorFactoryTask implements ProjectGeneratorFactory {
                   .fetch()
                   .size()
               > 0;
-      if (ProductRepository.PRODUCT_TYPE_SERVICE.equals(product.getProductTypeSelect())
+      if (product != null
+          && ProductRepository.PRODUCT_TYPE_SERVICE.equals(product.getProductTypeSelect())
           && saleOrderLine.getSaleSupplySelect() == SaleOrderLineRepository.SALE_SUPPLY_PRODUCE
           && !(isTaskGenerated)) {
 

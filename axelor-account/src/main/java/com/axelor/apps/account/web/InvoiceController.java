@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -173,6 +173,12 @@ public class InvoiceController {
     Invoice invoice = request.getContext().asType(Invoice.class);
     invoice = Beans.get(InvoiceRepository.class).find(invoice.getId());
 
+    if (invoice.getStatusSelect() == InvoiceRepository.STATUS_VENTILATED
+        && invoice.getCompany().getAccountConfig() != null
+        && !invoice.getCompany().getAccountConfig().getAllowCancelVentilatedInvoice()) {
+      return;
+    }
+
     Beans.get(InvoiceService.class).cancel(invoice);
     response.setFlash(I18n.get(IExceptionMessage.INVOICE_1));
     response.setReload(true);
@@ -311,9 +317,9 @@ public class InvoiceController {
             (List)
                 (((List) context.get("_ids"))
                     .stream()
-                    .filter(ObjectUtils::notEmpty)
-                    .map(input -> Long.parseLong(input.toString()))
-                    .collect(Collectors.toList()));
+                        .filter(ObjectUtils::notEmpty)
+                        .map(input -> Long.parseLong(input.toString()))
+                        .collect(Collectors.toList()));
         fileLink = Beans.get(InvoicePrintService.class).printInvoices(ids);
         title = I18n.get("Invoices");
       } else if (context.get("id") != null) {
@@ -848,9 +854,9 @@ public class InvoiceController {
             (List)
                 (((List) context.get("_ids"))
                     .stream()
-                    .filter(ObjectUtils::notEmpty)
-                    .map(input -> Long.parseLong(input.toString()))
-                    .collect(Collectors.toList()));
+                        .filter(ObjectUtils::notEmpty)
+                        .map(input -> Long.parseLong(input.toString()))
+                        .collect(Collectors.toList()));
 
         List<Long> invoiceToPay =
             Beans.get(InvoicePaymentCreateService.class).getInvoiceIdsToPay(invoiceIdList);
@@ -927,12 +933,16 @@ public class InvoiceController {
 
     long companyId = company.getPartner() == null ? 0 : company.getPartner().getId();
 
-    String domain =
-        String.format(
-            "self.id != %d AND self.isContact = false AND self.isCustomer = true", companyId);
+    String domain = String.format("self.id != %d AND self.isContact = false ", companyId);
     domain += " AND :company member of self.companySet";
 
     int invoiceTypeSelect = Beans.get(InvoiceService.class).getPurchaseTypeOrSaleType(invoice);
+
+    if (invoiceTypeSelect == 1) {
+      domain += " AND self.isCustomer = true ";
+    } else {
+      domain += " AND self.isSupplier = true ";
+    }
 
     try {
 

@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -50,9 +50,7 @@ public class ProjectManagementRepository extends ProjectRepository {
 
   public static void setAllProjectMembersUserSet(Project project) {
     if (project.getParentProject() == null && project.getChildProjectList() != null) {
-      project
-          .getChildProjectList()
-          .stream()
+      project.getChildProjectList().stream()
           .filter(Project::getExtendsMembersFromParent)
           .peek(p -> project.getMembersUserSet().forEach(p::addMembersUserSetItem))
           .forEach(p -> p.setTeam(project.getTeam()));

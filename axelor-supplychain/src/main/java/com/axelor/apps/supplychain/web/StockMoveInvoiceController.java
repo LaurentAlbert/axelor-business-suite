@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -23,7 +23,6 @@ import com.axelor.apps.account.db.PaymentMode;
 import com.axelor.apps.account.db.repo.InvoiceRepository;
 import com.axelor.apps.base.db.Partner;
 import com.axelor.apps.stock.db.StockMove;
-import com.axelor.apps.stock.db.StockMoveLine;
 import com.axelor.apps.stock.db.repo.StockMoveRepository;
 import com.axelor.apps.supplychain.exception.IExceptionMessage;
 import com.axelor.apps.supplychain.service.StockMoveInvoiceService;
@@ -58,7 +57,7 @@ public class StockMoveInvoiceController {
       if (context.containsKey("operationSelect")) {
         Integer operationSelect = Integer.parseInt(context.get("operationSelect").toString());
         List<Map<String, Object>> stockMoveLineListContext = null;
-        if (operationSelect == StockMoveRepository.INVOICE_PARTILLY
+        if (operationSelect == StockMoveRepository.INVOICE_PARTIALLY
             && context.containsKey("stockMoveLines")) {
           stockMoveLineListContext = (List<Map<String, Object>>) context.get("stockMoveLines");
         }
@@ -406,10 +405,15 @@ public class StockMoveInvoiceController {
       List<Map> stockMoveMap = (List<Map>) request.getContext().get("customerStockMoveToInvoice");
 
       List<Long> stockMoveIdList = new ArrayList<>();
+      List<StockMove> stockMoveList = new ArrayList<>();
 
       for (Map map : stockMoveMap) {
         stockMoveIdList.add(((Number) map.get("id")).longValue());
       }
+      for (Long stockMoveId : stockMoveIdList) {
+        stockMoveList.add(JPA.em().find(StockMove.class, stockMoveId));
+      }
+      Beans.get(StockMoveMultiInvoiceService.class).checkForAlreadyInvoicedStockMove(stockMoveList);
 
       Entry<List<Long>, String> result =
           Beans.get(StockMoveMultiInvoiceService.class).generateMultipleInvoices(stockMoveIdList);
@@ -444,10 +448,15 @@ public class StockMoveInvoiceController {
       List<Map> stockMoveMap = (List<Map>) request.getContext().get("supplierStockMoveToInvoice");
 
       List<Long> stockMoveIdList = new ArrayList<>();
+      List<StockMove> stockMoveList = new ArrayList<>();
 
       for (Map map : stockMoveMap) {
         stockMoveIdList.add(((Number) map.get("id")).longValue());
       }
+      for (Long stockMoveId : stockMoveIdList) {
+        stockMoveList.add(JPA.em().find(StockMove.class, stockMoveId));
+      }
+      Beans.get(StockMoveMultiInvoiceService.class).checkForAlreadyInvoicedStockMove(stockMoveList);
 
       Entry<List<Long>, String> result =
           Beans.get(StockMoveMultiInvoiceService.class).generateMultipleInvoices(stockMoveIdList);
@@ -480,18 +489,14 @@ public class StockMoveInvoiceController {
     try {
       Long id = Long.parseLong(request.getContext().get("_id").toString());
       StockMove stockMove = Beans.get(StockMoveRepository.class).find(id);
+      StockMoveInvoiceService stockMoveInvoiceService = Beans.get(StockMoveInvoiceService.class);
 
-      BigDecimal TotalInvoicedQty =
-          stockMove
-              .getStockMoveLineList()
-              .stream()
-              .map(StockMoveLine::getQtyInvoiced)
-              .reduce(BigDecimal::add)
-              .orElse(BigDecimal.ZERO);
-      if (TotalInvoicedQty.compareTo(BigDecimal.ZERO) == 0) {
+      BigDecimal totalInvoicedQty = stockMoveInvoiceService.computeNonCanceledInvoiceQty(stockMove);
+      if (totalInvoicedQty.compareTo(BigDecimal.ZERO) == 0) {
         response.setValue("operationSelect", StockMoveRepository.INVOICE_ALL);
       } else {
-        response.setValue("operationSelect", StockMoveRepository.INVOICE_PARTILLY);
+        response.setValue("operationSelect", StockMoveRepository.INVOICE_PARTIALLY);
+        response.setAttr("operationSelect", "selection-in", "[2]");
       }
       List<Map<String, Object>> stockMoveLines =
           Beans.get(StockMoveInvoiceService.class).getStockMoveLinesToInvoice(stockMove);
@@ -508,7 +513,7 @@ public class StockMoveInvoiceController {
       List<Map<String, Object>> stockMoveLines =
           Beans.get(StockMoveInvoiceService.class).getStockMoveLinesToInvoice(stockMove);
 
-      if (stockMoveLines.size() > 0) {
+      if (!stockMoveLines.isEmpty()) {
         response.setView(
             ActionView.define(I18n.get(ITranslation.INVOICING))
                 .model(StockMove.class.getName())

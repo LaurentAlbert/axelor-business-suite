@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -73,7 +73,8 @@ public class ProjectGeneratorFactoryPhase implements ProjectGeneratorFactory {
     projectRepository.save(project);
     for (SaleOrderLine saleOrderLine : saleOrder.getSaleOrderLineList()) {
       Product product = saleOrderLine.getProduct();
-      if (ProductRepository.PRODUCT_TYPE_SERVICE.equals(product.getProductTypeSelect())
+      if (product != null
+          && ProductRepository.PRODUCT_TYPE_SERVICE.equals(product.getProductTypeSelect())
           && saleOrderLine.getSaleSupplySelect() == SaleOrderLineRepository.SALE_SUPPLY_PRODUCE) {
         Project phase = projectBusinessService.generatePhaseProject(saleOrderLine, project);
         phase.setFromDate(startDate);
@@ -82,9 +83,7 @@ public class ProjectGeneratorFactoryPhase implements ProjectGeneratorFactory {
 
         if (!CollectionUtils.isEmpty(product.getTaskTemplateSet())) {
           productTaskTemplateService.convert(
-              product
-                  .getTaskTemplateSet()
-                  .stream()
+              product.getTaskTemplateSet().stream()
                   .filter(template -> Objects.isNull(template.getParentTaskTemplate()))
                   .collect(Collectors.toList()),
               phase,

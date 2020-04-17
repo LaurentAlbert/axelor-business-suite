@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -23,6 +23,7 @@ import com.axelor.apps.account.db.AnalyticMoveLine;
 import com.axelor.apps.base.db.Company;
 import com.axelor.apps.base.db.Partner;
 import com.axelor.apps.base.db.Product;
+import com.axelor.meta.CallMethod;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -43,4 +44,7 @@ public interface AnalyticMoveLineService {
       AnalyticMoveLine analyticMoveLine, BigDecimal total, LocalDate date);
 
   public boolean validateLines(List<AnalyticDistributionLine> analyticDistributionLineList);
+
+  @CallMethod
+  boolean validateAnalyticMoveLines(List<AnalyticMoveLine> analyticDistributionLineList);
 }

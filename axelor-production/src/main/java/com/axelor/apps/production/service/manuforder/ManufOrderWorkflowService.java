@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -88,7 +88,7 @@ public class ManufOrderWorkflowService {
       throw new AxelorException(
           manufOrder,
           TraceBackRepository.CATEGORY_INCONSISTENCY,
-          I18n.get("Bill of material and production process must be applicable"));
+          I18n.get("Bill of materials and production process must be applicable"));
     }
 
     if (Beans.get(SequenceService.class)
@@ -422,8 +422,7 @@ public class ManufOrderWorkflowService {
         Comparator.comparing(
             OperationOrder::getId, Comparator.nullsFirst(Comparator.naturalOrder()));
 
-    return operationOrderList
-        .stream()
+    return operationOrderList.stream()
         .sorted(byPriority.thenComparing(byId))
         .collect(Collectors.toList());
   }

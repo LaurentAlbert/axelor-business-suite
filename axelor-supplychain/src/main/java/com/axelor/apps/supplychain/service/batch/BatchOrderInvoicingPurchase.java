@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -103,8 +103,7 @@ public class BatchOrderInvoicingPurchase extends BatchOrderInvoicing {
     query.bind("anomalyList", anomalyList);
 
     String filter =
-        filterList
-            .stream()
+        filterList.stream()
             .map(item -> String.format("(%s)", item))
             .collect(Collectors.joining(" AND "));
     query.filter(filter);

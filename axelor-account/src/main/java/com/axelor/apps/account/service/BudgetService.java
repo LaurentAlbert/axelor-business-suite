@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -70,8 +70,7 @@ public class BudgetService {
     }
 
     BigDecimal totalAmountRealized =
-        budgetLineList
-            .stream()
+        budgetLineList.stream()
             .map(BudgetLine::getAmountRealized)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
 
@@ -102,7 +101,9 @@ public class BudgetService {
               for (BudgetLine budgetLine : budget.getBudgetLineList()) {
                 LocalDate fromDate = budgetLine.getFromDate();
                 LocalDate toDate = budgetLine.getToDate();
-                if ((fromDate.isBefore(date) || fromDate.isEqual(date))
+                if (fromDate != null
+                    && toDate != null
+                    && (fromDate.isBefore(date) || fromDate.isEqual(date))
                     && (toDate.isAfter(date) || toDate.isEqual(date))) {
                   budgetLine.setAmountRealized(
                       budgetLine.getAmountRealized().add(budgetDistribution.getAmount()));
@@ -148,13 +149,13 @@ public class BudgetService {
     int c = 0;
     int loopLimit = 1000;
     while (budgetLineToDate.isBefore(toDate)) {
-      if (budgetLineNumber != 1) fromDate = fromDate.plusMonths(duration);
+      if (budgetLineNumber != 1 && duration != 0) fromDate = fromDate.plusMonths(duration);
       if (c >= loopLimit) {
         throw new AxelorException(
             TraceBackRepository.CATEGORY_INCONSISTENCY, I18n.get(IExceptionMessage.BUDGET_1));
       }
       c += 1;
-      budgetLineToDate = fromDate.plusMonths(duration).minusDays(1);
+      budgetLineToDate = duration == 0 ? toDate : fromDate.plusMonths(duration).minusDays(1);
       if (budgetLineToDate.isAfter(toDate)) budgetLineToDate = toDate;
       if (fromDate.isAfter(toDate)) continue;
       BudgetLine budgetLine = new BudgetLine();
@@ -164,6 +165,7 @@ public class BudgetService {
       budgetLine.setAmountExpected(budget.getAmountForGeneration());
       budgetLineList.add(budgetLine);
       budgetLineNumber++;
+      if (duration == 0) break;
     }
     return budgetLineList;
   }
@@ -224,8 +226,7 @@ public class BudgetService {
       return;
     }
 
-    invoiceLineList
-        .stream()
+    invoiceLineList.stream()
         .filter(invoiceLine -> invoiceLine.getBudgetDistributionList() != null)
         .flatMap(x -> x.getBudgetDistributionList().stream())
         .forEach(

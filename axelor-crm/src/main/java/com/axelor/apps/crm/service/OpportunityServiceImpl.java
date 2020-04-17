@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -25,6 +25,7 @@ import com.axelor.apps.crm.db.Lead;
 import com.axelor.apps.crm.db.Opportunity;
 import com.axelor.apps.crm.db.repo.OpportunityRepository;
 import com.axelor.apps.crm.exception.IExceptionMessage;
+import com.axelor.apps.message.db.EmailAddress;
 import com.axelor.exception.AxelorException;
 import com.axelor.exception.db.repo.TraceBackRepository;
 import com.axelor.i18n.I18n;
@@ -61,12 +62,17 @@ public class OpportunityServiceImpl implements OpportunityService {
       // avoids printing 'null'
       String addressL6 =
           lead.getPrimaryPostalCode() == null ? "" : lead.getPrimaryPostalCode() + " ";
-      addressL6 += lead.getPrimaryCity() == null ? "" : lead.getPrimaryCity();
+      addressL6 += lead.getPrimaryCity() == null ? "" : lead.getPrimaryCity().getName();
 
       address =
           addressService.createAddress(
               null, null, lead.getPrimaryAddress(), null, addressL6, lead.getPrimaryCountry());
       address.setFullName(addressService.computeFullName(address));
+    }
+
+    EmailAddress email = null;
+    if (lead.getEmailAddress() != null) {
+      email = new EmailAddress(lead.getEmailAddress().getAddress());
     }
 
     Partner partner =
@@ -76,7 +82,7 @@ public class OpportunityServiceImpl implements OpportunityService {
                 null,
                 lead.getFixedPhone(),
                 lead.getMobilePhone(),
-                lead.getEmailAddress(),
+                email,
                 opportunity.getCurrency(),
                 address,
                 address);

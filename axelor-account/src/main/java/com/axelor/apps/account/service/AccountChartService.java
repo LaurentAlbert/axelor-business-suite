@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -96,13 +96,14 @@ public class AccountChartService {
 
     File configFile = File.createTempFile("input-config", ".xml");
 
-    FileOutputStream outputStream = new FileOutputStream(configFile);
-    int read = 0;
-    byte[] bytes = new byte[1024];
-    while ((read = inputStream.read(bytes)) != -1) {
-      outputStream.write(bytes, 0, read);
+    try (FileOutputStream outputStream = new FileOutputStream(configFile)) {
+      int read = 0;
+      byte[] bytes = new byte[1024];
+      while ((read = inputStream.read(bytes)) != -1) {
+        outputStream.write(bytes, 0, read);
+      }
+      outputStream.close();
     }
-    outputStream.close();
 
     return configFile;
   }

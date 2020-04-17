@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -79,8 +79,7 @@ public class PurchaseRequestController {
                 .filter("self.id in (?1)", requestIds)
                 .fetch();
         List<String> purchaseRequestSeqs =
-            purchaseRequests
-                .stream()
+            purchaseRequests.stream()
                 .filter(pr -> pr.getSupplierUser() == null)
                 .map(PurchaseRequest::getPurchaseRequestSeq)
                 .collect(Collectors.toList());

@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -114,7 +114,7 @@ public class TrainingRegisterServiceImpl implements TrainingRegisterService {
 
     log.debug("Avg training rating : {}", avgRating);
 
-    training.setRating(new BigDecimal(avgRating));
+    training.setRating(BigDecimal.valueOf(avgRating));
 
     return trainingRepo.save(training);
   }
@@ -137,7 +137,7 @@ public class TrainingRegisterServiceImpl implements TrainingRegisterService {
 
     log.debug("Avg session rating : {}", avgRating);
 
-    session.setRating(new BigDecimal(avgRating));
+    session.setRating(BigDecimal.valueOf(avgRating));
     session.setNbrRegistered(totalSessionSize);
 
     return trainingSessionRepo.save(session);

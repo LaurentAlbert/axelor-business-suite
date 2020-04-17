@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -39,6 +39,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -132,6 +133,16 @@ public class MoveTemplateController {
       if (!isValid) {
         response.setValue("isValid", false);
       }
+    }
+  }
+
+  public void computeTotals(ActionRequest request, ActionResponse response) {
+    try {
+      MoveTemplate moveTemplate = request.getContext().asType(MoveTemplate.class);
+      Map<String, Object> values = Beans.get(MoveTemplateService.class).computeTotals(moveTemplate);
+      response.setValues(values);
+    } catch (Exception e) {
+      TraceBackService.trace(response, e);
     }
   }
 }

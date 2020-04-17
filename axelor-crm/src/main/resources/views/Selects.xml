@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <object-views xmlns="http://axelor.com/xml/ns/object-views"
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://axelor.com/xml/ns/object-views http://axelor.com/xml/ns/object-views/object-views_5.1.xsd">
+	xsi:schemaLocation="http://axelor.com/xml/ns/object-views http://axelor.com/xml/ns/object-views/object-views_5.2.xsd">
 
 
 	<!-- Nomenclature : * name : "interfaceName" + "fieldName" + ".select" -->
@@ -141,6 +141,10 @@
 	<selection name="crm.app.crm.assignable.user.select">
 		<option value="0">All users</option>
 		<option value="1">Some user groups</option>
+	</selection>
+	
+	<selection name='trace.back.origin.select' id="trace.back.origin.select.crm">
+		<option value="crm">CRM</option>
 	</selection>
 
 </object-views>

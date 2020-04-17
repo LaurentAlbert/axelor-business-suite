@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -267,10 +267,12 @@ public class PurchaseOrderLineServiceImpl implements PurchaseOrderLineService {
     Product product = line.getProduct();
 
     String[] productSupplierInfos = getProductSupplierInfos(purchaseOrder, line);
-    line.setProductName(productSupplierInfos[0]);
+    if (!line.getEnableFreezeFields()) {
+      line.setProductName(productSupplierInfos[0]);
+      line.setQty(getQty(purchaseOrder, line));
+    }
     line.setProductCode(productSupplierInfos[1]);
     line.setUnit(getPurchaseUnit(line));
-    line.setQty(getQty(purchaseOrder, line));
 
     if (appPurchaseService.getAppPurchase().getIsEnabledProductDescriptionCopy()) {
       line.setDescription(product.getDescription());
@@ -325,8 +327,9 @@ public class PurchaseOrderLineServiceImpl implements PurchaseOrderLineService {
       }
       line.setDiscountTypeSelect((Integer) discounts.get("discountTypeSelect"));
     }
-
-    line.setPrice(price);
+    if (!line.getEnableFreezeFields()) {
+      line.setPrice(price);
+    }
     line.setInTaxPrice(inTaxPrice);
 
     line.setSaleMinPrice(getMinSalePrice(purchaseOrder, line));
@@ -339,12 +342,15 @@ public class PurchaseOrderLineServiceImpl implements PurchaseOrderLineService {
 
   @Override
   public PurchaseOrderLine reset(PurchaseOrderLine line) {
+    if (!line.getEnableFreezeFields()) {
+      line.setQty(BigDecimal.ZERO);
+      line.setPrice(null);
+      line.setProductName(null);
+    }
     line.setTaxLine(null);
-    line.setProductName(null);
     line.setUnit(null);
     line.setDiscountAmount(null);
     line.setDiscountTypeSelect(PriceListLineRepository.AMOUNT_TYPE_NONE);
-    line.setPrice(null);
     line.setInTaxPrice(null);
     line.setSaleMinPrice(null);
     line.setSalePrice(null);
@@ -353,7 +359,6 @@ public class PurchaseOrderLineServiceImpl implements PurchaseOrderLineService {
     line.setCompanyInTaxTotal(null);
     line.setCompanyExTaxTotal(null);
     line.setProductCode(null);
-    line.setQty(BigDecimal.ZERO);
     if (appPurchaseService.getAppPurchase().getIsEnabledProductDescriptionCopy()) {
       line.setDescription(null);
     }

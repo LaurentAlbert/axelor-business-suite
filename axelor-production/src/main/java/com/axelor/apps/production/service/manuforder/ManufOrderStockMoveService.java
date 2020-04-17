@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -20,6 +20,7 @@ package com.axelor.apps.production.service.manuforder;
 import com.axelor.apps.base.db.Company;
 import com.axelor.apps.base.db.Product;
 import com.axelor.apps.base.db.repo.ProductRepository;
+import com.axelor.apps.base.service.app.AppBaseService;
 import com.axelor.apps.production.db.ManufOrder;
 import com.axelor.apps.production.db.OperationOrder;
 import com.axelor.apps.production.db.ProdProcess;
@@ -62,12 +63,16 @@ public class ManufOrderStockMoveService {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   protected StockMoveService stockMoveService;
   protected StockMoveLineService stockMoveLineService;
+  protected AppBaseService appBaseService;
 
   @Inject
   public ManufOrderStockMoveService(
-      StockMoveService stockMoveService, StockMoveLineService stockMoveLineService) {
+      StockMoveService stockMoveService,
+      StockMoveLineService stockMoveLineService,
+      AppBaseService appBaseService) {
     this.stockMoveService = stockMoveService;
     this.stockMoveLineService = stockMoveLineService;
+    this.appBaseService = appBaseService;
   }
 
   public void createToConsumeStockMove(ManufOrder manufOrder) throws AxelorException {
@@ -332,9 +337,7 @@ public class ManufOrderStockMoveService {
    * @param stockMove
    */
   protected void updateRealPrice(ManufOrder manufOrder, StockMove stockMove) {
-    stockMove
-        .getStockMoveLineList()
-        .stream()
+    stockMove.getStockMoveLineList().stream()
         .filter(
             stockMoveLine ->
                 stockMoveLine.getProduct() != null
@@ -456,8 +459,7 @@ public class ManufOrderStockMoveService {
    * @return an optional stock move
    */
   public Optional<StockMove> getPlannedStockMove(List<StockMove> stockMoveList) {
-    return stockMoveList
-        .stream()
+    return stockMoveList.stream()
         .filter(stockMove -> stockMove.getStatusSelect() == StockMoveRepository.STATUS_PLANNED)
         .findFirst();
   }
@@ -570,9 +572,7 @@ public class ManufOrderStockMoveService {
       _createStockMoveLine(prodProduct, stockMove, StockMoveLineService.TYPE_IN_PRODUCTIONS, qty);
 
       // Update consumed StockMoveLineList with created stock move lines
-      stockMove
-          .getStockMoveLineList()
-          .stream()
+      stockMove.getStockMoveLineList().stream()
           .filter(
               stockMoveLine1 -> !manufOrder.getConsumedStockMoveLineList().contains(stockMoveLine1))
           .forEach(manufOrder::addConsumedStockMoveLineListItem);
@@ -616,9 +616,7 @@ public class ManufOrderStockMoveService {
           getCostPriceFromProduct(prodProduct));
 
       // Update produced StockMoveLineList with created stock move lines
-      stockMove
-          .getStockMoveLineList()
-          .stream()
+      stockMove.getStockMoveLineList().stream()
           .filter(
               stockMoveLine1 -> !manufOrder.getProducedStockMoveLineList().contains(stockMoveLine1))
           .forEach(manufOrder::addProducedStockMoveLineListItem);
@@ -639,6 +637,11 @@ public class ManufOrderStockMoveService {
     BigDecimal manufOrderQty = manufOrder.getQty();
     BigDecimal prodProductQty = prodProduct.getQty();
 
-    return qtyToUpdate.multiply(prodProductQty).divide(manufOrderQty, 2, RoundingMode.HALF_EVEN);
+    int scale = appBaseService.getNbDecimalDigitForQty();
+
+    return qtyToUpdate
+        .multiply(prodProductQty)
+        .setScale(scale, RoundingMode.HALF_EVEN)
+        .divide(manufOrderQty, scale, RoundingMode.HALF_EVEN);
   }
 }

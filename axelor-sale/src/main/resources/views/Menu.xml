@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <object-views xmlns="http://axelor.com/xml/ns/object-views"
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://axelor.com/xml/ns/object-views http://axelor.com/xml/ns/object-views/object-views_5.1.xsd">
+	xsi:schemaLocation="http://axelor.com/xml/ns/object-views http://axelor.com/xml/ns/object-views/object-views_5.2.xsd">
 	
 	
 	<menuitem name="sc-root-sale" title="Sales" order="-106"  if="__config__.app.isApp('sale')"
@@ -36,6 +36,15 @@
 		<view-param name="search-filters" value="partner-filters"/>
 		<domain>self.isContact = true AND self.mainPartner.isCustomer = true</domain>
 		<context name="_domain" expr="self.isContact = true AND self.mainPartner.isCustomer = true"/>
+	</action-view>
+	
+	<menuitem name="sc-root-sale-pack" parent="sc-root-sale" order="12"
+		title="Pack" action="sc.root.sale.pack" if="__config__.app.getApp('sale')?.enablePackManagement"/>
+
+	<action-view name="sc.root.sale.pack" title="Pack"
+		model="com.axelor.apps.sale.db.Pack" >
+		<view type="grid" name="pack-grid" />
+		<view type="form" name="pack-form" />
 	</action-view>
 	
 	<menuitem name="sc-root-sale-products" parent="sc-root-sale" order="15"
@@ -232,8 +241,8 @@
 				 model="com.axelor.apps.sale.db.Configurator" >
 		<view type="grid" name="configurator-grid" />
 		<view type="form" name="configurator-form" />
-		<domain>:__user__ IN self.configuratorCreator.authorizedUserSet OR :groupId IN self.configuratorCreator.authorizedGroupSet</domain>
-		<context name="groupId" expr="eval: __user__.group.id"/>
+		<domain>:__user__ MEMBER OF self.configuratorCreator.authorizedUserSet OR :_group MEMBER OF self.configuratorCreator.authorizedGroupSet</domain>
+		<context name="_group" expr="eval: __user__.group"/>
 	</action-view>
 
 <!-- ADMINISTRATION -->
@@ -287,9 +296,9 @@
 	</action-view>
 		
 	<menuitem name="menu-saleman-dashboard-sample" parent="sc-root-sale-report" order="-205"
-		title="Salesman"  action="saleman.dashboard.view.sample" />
+		title="Salesperson"  action="saleman.dashboard.view.sample" />
 		
-	<action-view name="saleman.dashboard.view.sample" title="Salesman Details">
+	<action-view name="saleman.dashboard.view.sample" title="Salesperson Details">
 		<view type="dashboard" name="sale.saleman.dashboard.sample" />
     	<context name="_user" expr="eval:__user__"/>
     	<context name="_user_id" expr="eval:__user__.id"/>

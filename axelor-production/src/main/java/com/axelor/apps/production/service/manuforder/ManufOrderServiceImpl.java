@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -81,6 +81,7 @@ public class ManufOrderServiceImpl implements ManufOrderService {
   protected OperationOrderService operationOrderService;
   protected ManufOrderWorkflowService manufOrderWorkflowService;
   protected ProductVariantService productVariantService;
+  protected AppBaseService appBaseService;
   protected AppProductionService appProductionService;
   protected ManufOrderRepository manufOrderRepo;
   protected ProdProductRepository prodProductRepo;
@@ -91,6 +92,7 @@ public class ManufOrderServiceImpl implements ManufOrderService {
       OperationOrderService operationOrderService,
       ManufOrderWorkflowService manufOrderWorkflowService,
       ProductVariantService productVariantService,
+      AppBaseService appBaseService,
       AppProductionService appProductionService,
       ManufOrderRepository manufOrderRepo,
       ProdProductRepository prodProductRepo) {
@@ -98,6 +100,7 @@ public class ManufOrderServiceImpl implements ManufOrderService {
     this.operationOrderService = operationOrderService;
     this.manufOrderWorkflowService = manufOrderWorkflowService;
     this.productVariantService = productVariantService;
+    this.appBaseService = appBaseService;
     this.appProductionService = appProductionService;
     this.manufOrderRepo = manufOrderRepo;
     this.prodProductRepo = prodProductRepo;
@@ -122,7 +125,11 @@ public class ManufOrderServiceImpl implements ManufOrderService {
 
     Company company = billOfMaterial.getCompany();
 
-    BigDecimal qty = qtyRequested.divide(billOfMaterial.getQty(), 2, RoundingMode.HALF_EVEN);
+    BigDecimal qty =
+        qtyRequested.divide(
+            billOfMaterial.getQty(),
+            appBaseService.getNbDecimalDigitForQty(),
+            RoundingMode.HALF_EVEN);
 
     ManufOrder manufOrder =
         this.createManufOrder(
@@ -186,10 +193,7 @@ public class ManufOrderServiceImpl implements ManufOrderService {
       qty =
           manufOrderQty
               .multiply(lineQty)
-              .divide(
-                  bomQty,
-                  Beans.get(AppProductionService.class).getNbDecimalDigitForBomQty(),
-                  RoundingMode.HALF_EVEN);
+              .divide(bomQty, appBaseService.getNbDecimalDigitForQty(), RoundingMode.HALF_EVEN);
     }
     return qty;
   }
@@ -198,8 +202,7 @@ public class ManufOrderServiceImpl implements ManufOrderService {
       Collection<BillOfMaterial> billsOfMaterials) {
 
     billsOfMaterials = MoreObjects.firstNonNull(billsOfMaterials, Collections.emptyList());
-    return billsOfMaterials
-        .stream()
+    return billsOfMaterials.stream()
         .sorted(
             Comparator.comparing(BillOfMaterial::getPriority)
                 .thenComparing(Comparator.comparing(BillOfMaterial::getId)))
@@ -235,9 +238,7 @@ public class ManufOrderServiceImpl implements ManufOrderService {
                     .getQty()
                     .multiply(manufOrderQty)
                     .divide(
-                        bomQty,
-                        appProductionService.getNbDecimalDigitForBomQty(),
-                        RoundingMode.HALF_EVEN)
+                        bomQty, appBaseService.getNbDecimalDigitForQty(), RoundingMode.HALF_EVEN)
                 : BigDecimal.ZERO;
 
         manufOrder.addToProduceProdProductListItem(
@@ -539,8 +540,7 @@ public class ManufOrderServiceImpl implements ManufOrderService {
       Product product = prodProduct.getProduct();
       Unit newUnit = prodProduct.getUnit();
       List<StockMoveLine> stockMoveLineProductList =
-          stockMoveLineList
-              .stream()
+          stockMoveLineList.stream()
               .filter(stockMoveLine1 -> stockMoveLine1.getProduct() != null)
               .filter(stockMoveLine1 -> stockMoveLine1.getProduct().equals(product))
               .collect(Collectors.toList());
@@ -564,13 +564,11 @@ public class ManufOrderServiceImpl implements ManufOrderService {
     // There are stock move lines with products that are not available in
     // prod product list. It needs to appear in the prod product list
     List<StockMoveLine> stockMoveLineMissingProductList =
-        stockMoveLineList
-            .stream()
+        stockMoveLineList.stream()
             .filter(stockMoveLine1 -> stockMoveLine1.getProduct() != null)
             .filter(
                 stockMoveLine1 ->
-                    !prodProductList
-                        .stream()
+                    !prodProductList.stream()
                         .map(ProdProduct::getProduct)
                         .collect(Collectors.toList())
                         .contains(stockMoveLine1.getProduct()))
@@ -654,8 +652,7 @@ public class ManufOrderServiceImpl implements ManufOrderService {
       throws AxelorException {
 
     List<StockMoveLine> realizedProducedStockMoveLineList =
-        stockMoveLineList
-            .stream()
+        stockMoveLineList.stream()
             .filter(
                 stockMoveLine ->
                     stockMoveLine.getStockMove() != null
@@ -664,8 +661,7 @@ public class ManufOrderServiceImpl implements ManufOrderService {
             .sorted(Comparator.comparingLong(StockMoveLine::getId))
             .collect(Collectors.toList());
     List<StockMoveLine> oldRealizedProducedStockMoveLineList =
-        oldStockMoveLineList
-            .stream()
+        oldStockMoveLineList.stream()
             .filter(
                 stockMoveLine ->
                     stockMoveLine.getStockMove() != null
@@ -690,8 +686,7 @@ public class ManufOrderServiceImpl implements ManufOrderService {
     }
 
     // add missing lines in stock move
-    stockMoveLineList
-        .stream()
+    stockMoveLineList.stream()
         .filter(stockMoveLine -> stockMoveLine.getStockMove() == null)
         .forEach(stockMove::addStockMoveLineListItem);
 

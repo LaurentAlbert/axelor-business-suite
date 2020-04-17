@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <xml-inputs xmlns="http://axelor.com/xml/ns/data-import"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://axelor.com/xml/ns/data-import http://axelor.com/xml/ns/data-import/data-import_5.1.xsd">
+  xsi:schemaLocation="http://axelor.com/xml/ns/data-import http://axelor.com/xml/ns/data-import/data-import_5.2.xsd">
 	
 	<input file="bpm_appBuilder.xml" root="app-builders">
 		<bind node="app-builder" type="com.axelor.studio.db.AppBuilder"  call="com.axelor.studio.service.ImportService:importAppBuilderImg">
@@ -21,6 +21,7 @@
 			<bind node="@name" to="name" />
 			<bind node="@title" to="title" />
 			<bind node="@appBuilder" to="appBuilder" search="self.code = :appBuilder"  />
+			<bind to="formWidth" eval="'large'" />
 			<bind node="fields/field" to="fields">
 				<bind node="@name" to="name"/>
 				<bind node="@title" to="title" />
@@ -34,6 +35,7 @@
 				<bind node="@sequence" to="sequence"/>
 				<bind node="@onChange" to="onChange" />
 				<bind node="@visibleInGrid" to="visibleInGrid" />
+				<bind node="@widgetAttrs" to="widgetAttrs" />
 			</bind>
 		</bind>
 		
@@ -156,6 +158,8 @@
 				<bind node="@value" to="value"/>
 				<bind node="@filter" to="filter"/>
 				<bind node="@dummy" to="dummy"/>
+				<bind node="@isSourceJson" to="isSourceJson"/>
+				<bind node="@isTargetJson" to="isTargetJson"/>
 				<bind node="subLines/line" to="subLines">
 					<bind node="@metaModel" to="metaModel" />
 					<bind node="@valueModel" to="valueModel" />

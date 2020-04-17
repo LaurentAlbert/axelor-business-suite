@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -110,12 +110,8 @@ public class AccountService {
 
   public List<Long> getSubAccounts(Long accountId) {
 
-    return accountRepository
-        .all()
-        .filter("self.parentAccount.id = ?1", accountId)
-        .select("id")
-        .fetch(0, 0)
-        .stream()
+    return accountRepository.all().filter("self.parentAccount.id = ?1", accountId).select("id")
+        .fetch(0, 0).stream()
         .map(m -> (Long) m.get("id"))
         .collect(Collectors.toList());
   }

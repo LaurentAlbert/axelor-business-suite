@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -30,10 +30,9 @@ import javax.xml.ws.WebServiceFeature;
  * version: 2.6.2
  */
 @WebServiceClient(
-  name = "ProWeb",
-  wsdlLocation = "http://ip.axelor.com:2021/proweb.wsdl",
-  targetNamespace = "http://www.qas.com/web-2005-02"
-)
+    name = "ProWeb",
+    wsdlLocation = "http://ip.axelor.com:2021/proweb.wsdl",
+    targetNamespace = "http://www.qas.com/web-2005-02")
 public class ProWeb extends Service {
 
   public static final URL WSDL_LOCATION;

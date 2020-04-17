@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -289,9 +289,8 @@ public class InvoiceServiceImpl extends InvoiceRepository implements InvoiceServ
     for (InvoiceLine invoiceLine : invoice.getInvoiceLineList()) {
       Account account = invoiceLine.getAccount();
 
-      if (account == null
-          && (invoiceLine.getTypeSelect() == InvoiceLineRepository.TYPE_NORMAL)
-          && invoiceLineService.isAccountRequired(invoiceLine)) {
+      if (invoiceLine.getAccount() == null
+          && (invoiceLine.getTypeSelect() == InvoiceLineRepository.TYPE_NORMAL)) {
         throw new AxelorException(
             invoice,
             TraceBackRepository.CATEGORY_MISSING_FIELD,
@@ -634,8 +633,7 @@ public class InvoiceServiceImpl extends InvoiceRepository implements InvoiceServ
       return false;
     }
     BigDecimal totalAmount =
-        invoicePayments
-            .stream()
+        invoicePayments.stream()
             .map(InvoicePayment::getAmount)
             .reduce(BigDecimal::add)
             .orElse(BigDecimal.ZERO);
@@ -916,8 +914,7 @@ public class InvoiceServiceImpl extends InvoiceRepository implements InvoiceServ
     pfpValidatorUserDomain
         .append("(")
         .append(
-            validPfpValidatorUserList
-                .stream()
+            validPfpValidatorUserList.stream()
                 .map(pfpValidator -> pfpValidator.getId().toString())
                 .collect(Collectors.joining(",")))
         .append(")");

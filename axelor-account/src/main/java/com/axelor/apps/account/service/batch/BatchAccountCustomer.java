@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -93,7 +93,7 @@ public class BatchAccountCustomer extends BatchStrategy {
                     I18n.get(IExceptionMessage.BATCH_ACCOUNT_1),
                     accountingSituationRepo.find(accountingSituation.getId()).getName()),
                 e),
-            ExceptionOriginRepository.ACCOUNT_CUSTOMER,
+            ExceptionOriginRepository.CUSTOMER_ACCOUNT,
             batch.getId());
 
         incrementAnomaly();
@@ -168,7 +168,7 @@ public class BatchAccountCustomer extends BatchStrategy {
                     I18n.get(IExceptionMessage.BATCH_ACCOUNT_1),
                     accountingSituationRepo.find(accountingSituation.getId()).getName()),
                 e),
-            ExceptionOriginRepository.ACCOUNT_CUSTOMER,
+            ExceptionOriginRepository.CUSTOMER_ACCOUNT,
             batch.getId());
 
         anomaly++;

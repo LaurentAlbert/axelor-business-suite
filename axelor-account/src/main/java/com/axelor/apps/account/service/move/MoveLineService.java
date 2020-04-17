@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -147,7 +147,9 @@ public class MoveLineService {
     } else {
       moveLine.getAnalyticMoveLineList().clear();
     }
-    moveLine.getAnalyticMoveLineList().addAll(analyticMoveLineList);
+    for (AnalyticMoveLine analyticMoveLine : analyticMoveLineList) {
+      moveLine.addAnalyticMoveLineListItem(analyticMoveLine);
+    }
     return moveLine;
   }
 
@@ -239,7 +241,7 @@ public class MoveLineService {
   }
 
   /**
-   * Creating accounting move line method using all currency informations (amount in specific move
+   * Creating accounting move line method using all currency information (amount in specific move
    * currency, amount in company currency, currency rate)
    *
    * @param move
@@ -979,15 +981,11 @@ public class MoveLineService {
   protected Pair<List<MoveLine>, List<MoveLine>> findMoveLineLists(
       Pair<List<MoveLine>, List<MoveLine>> moveLineLists) {
     List<MoveLine> fetchedDebitMoveLineList =
-        moveLineLists
-            .getLeft()
-            .stream()
+        moveLineLists.getLeft().stream()
             .map(moveLine -> moveLineRepository.find(moveLine.getId()))
             .collect(Collectors.toList());
     List<MoveLine> fetchedCreditMoveLineList =
-        moveLineLists
-            .getRight()
-            .stream()
+        moveLineLists.getRight().stream()
             .map(moveLine -> moveLineRepository.find(moveLine.getId()))
             .collect(Collectors.toList());
     return Pair.of(fetchedDebitMoveLineList, fetchedCreditMoveLineList);

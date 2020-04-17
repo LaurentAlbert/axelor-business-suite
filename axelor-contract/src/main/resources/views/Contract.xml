@@ -2,7 +2,7 @@
 <object-views xmlns="http://axelor.com/xml/ns/object-views"
               xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
               xsi:schemaLocation="http://axelor.com/xml/ns/object-views
-              http://axelor.com/xml/ns/object-views/object-views_5.1.xsd">
+              http://axelor.com/xml/ns/object-views/object-views_5.2.xsd">
 
 	<grid name="contract-grid" title="Contracts" model="com.axelor.apps.contract.db.Contract">
 		<field name="contractId" width="120"/>
@@ -294,7 +294,7 @@
     </action-method>
 
     <form name="contract-archived-version-form" title="Version" model="com.axelor.apps.contract.db.ContractVersion">
-        <panel title="Informations" name="informationsPanel">
+        <panel title="Information" name="informationsPanel">
             <field name="statusSelect" colSpan="12" readonly="true" widget="NavSelect" showTitle="false"/>
             <panel showIf="id" colSpan="12" name="creationDetailsPanel">
                 <field name="createdOn"/>

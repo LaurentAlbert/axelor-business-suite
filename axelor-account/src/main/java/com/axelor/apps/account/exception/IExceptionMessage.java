@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -52,9 +52,13 @@ public interface IExceptionMessage {
   static final String MOVE_ARCHIVE_OR_REMOVE_NOT_OK = /*$$(*/
       "Error in move deleting or archiving, please check the log" /*)*/;
   static final String MOVE_ARCHIVE_NOT_OK_BECAUSE_OF_LINK_WITH = /*$$(*/
-      "This move %s can not be archive because it is linked to another piece named %s." /*)*/;
+      "This move %s can not be archived because it is linked to another piece named %s." /*)*/;
   static final String MOVE_LINE_ARCHIVE_NOT_OK_BECAUSE_OF_LINK_WITH = /*$$(*/
-      "This move line %s can not be archive because it is linked to another piece named %s." /*)*/;
+      "This move line %s can not be archived because it is linked to another piece named %s." /*)*/;
+  static final String MOVE_LINE_RECONCILE_LINE_CANNOT_BE_REMOVED = /*$$(*/
+      "The move lines %s are reconciled and should not have been removed." /*)*/;;
+  static final String MOVE_ARCHIVE_OR_REMOVE_NOT_OK_NB = /*$$(*/
+      "%d moves couldn't be deleted or archived, please check the logs." /*)*/;
 
   /** Account management service */
   static final String ACCOUNT_MANAGEMENT_1_ACCOUNT = /*$$(*/
@@ -83,7 +87,7 @@ public interface IExceptionMessage {
 
   /** Account clearance service and controller */
   static final String ACCOUNT_CLEARANCE_1 = /*$$(*/
-      "%s : You must configure account informations for the company %s" /*)*/;
+      "%s : You must configure account information for the company %s" /*)*/;
 
   static final String ACCOUNT_CLEARANCE_2 = /*$$(*/
       "%s : You must configure a financial account for then company %s" /*)*/;
@@ -388,7 +392,7 @@ public interface IExceptionMessage {
       "%s : Please, configure a currency for the company %s" /*)*/;
 
   static final String ACCOUNT_CONFIG_1 = /*$$(*/
-      "%s : You must configure account's informations for the company %s" /*)*/;
+      "%s : You must configure account's information for the company %s" /*)*/;
   static final String ACCOUNT_CONFIG_2 = /*$$(*/
       "%s : You must configure a CFONB format reimbursement's export's folder for the company %s" /*)*/;
   static final String ACCOUNT_CONFIG_3 = /*$$(*/
@@ -532,6 +536,8 @@ public interface IExceptionMessage {
       "%s : Letter template missing for debt recovery matrix %s (Partner %s, Level %s)." /*)*/;
   static final String DEBT_RECOVERY_ACTION_4 = /*$$(*/
       "Email is not sent. Please check email account configuration." /*)*/;
+  static final String DEBT_RECOVERY_ACTION_5 = /*$$(*/
+      "No email address in debt recovery %s. Please set one." /*)*/;
 
   /** Debt recovery service */
   static final String DEBT_RECOVERY_1 = /*$$(*/ "There's no accounting situation." /*)*/;
@@ -761,6 +767,8 @@ public interface IExceptionMessage {
    */
   static final String SUBROGATION_RELEASE_MISSING_SEQUENCE = /*$$(*/
       "Missing subrogation release sequence for company %s" /*)*/;
+  static final String SUBROGATION_RELEASE_SUBROGATION_ALREADY_EXIST_FOR_INVOICES = /*$$(*/
+      "A transmitted or a accounted subrogation release already exist for the invoices %s." /*)*/;
 
   /** MoveLine */
   static final String NO_MOVE_LINE_SELECTED = /*$$(*/ "No Lines selected" /*)*/;
@@ -795,4 +803,10 @@ public interface IExceptionMessage {
 
   static final String CLOSE_NO_REPORTED_BALANCE_DATE = /*$$(*/
       "Please set a reported balance date on fiscal year" /*)*/;
+
+  static final String ACCOUNT_CODE_ALREADY_IN_USE_FOR_COMPANY = /*$$(*/
+      "The account code %s is already used for the company %s, there cannot be two accounts with the same code for the same company." /*)*/;;
+
+  static final String INVALID_ANALYTIC_MOVE_LINE = /*$$(*/
+      "Invalid Analytic moveLines, some axes percentage values are higher than 100%." /*)*/;
 }

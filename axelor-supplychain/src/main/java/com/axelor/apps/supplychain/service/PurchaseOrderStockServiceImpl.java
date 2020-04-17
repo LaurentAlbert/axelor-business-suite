@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -126,9 +126,7 @@ public class PurchaseOrderStockServiceImpl implements PurchaseOrderStockService 
         getAllPurchaseOrderLinePerDate(purchaseOrder);
 
     for (LocalDate estimatedDeliveryDate :
-        purchaseOrderLinePerDateMap
-            .keySet()
-            .stream()
+        purchaseOrderLinePerDateMap.keySet().stream()
             .filter(x -> x != null)
             .sorted((x, y) -> x.compareTo(y))
             .collect(Collectors.toList())) {
@@ -397,6 +395,7 @@ public class PurchaseOrderStockServiceImpl implements PurchaseOrderStockService 
     BigDecimal shippingCoef =
         shippingCoefService.getShippingCoef(
             product, purchaseOrder.getSupplierPartner(), purchaseOrder.getCompany(), qty);
+    BigDecimal companyPurchasePrice = priceDiscounted;
     priceDiscounted = priceDiscounted.multiply(shippingCoef);
     companyUnitPriceUntaxed = companyUnitPriceUntaxed.multiply(shippingCoef);
 
@@ -414,6 +413,7 @@ public class PurchaseOrderStockServiceImpl implements PurchaseOrderStockService 
         BigDecimal.ZERO,
         priceDiscounted,
         companyUnitPriceUntaxed,
+        companyPurchasePrice,
         unit,
         stockMove,
         StockMoveLineService.TYPE_PURCHASES,
@@ -430,6 +430,7 @@ public class PurchaseOrderStockServiceImpl implements PurchaseOrderStockService 
         purchaseOrderLine.getProduct(),
         purchaseOrderLine.getProductName(),
         purchaseOrderLine.getDescription(),
+        BigDecimal.ZERO,
         BigDecimal.ZERO,
         BigDecimal.ZERO,
         BigDecimal.ZERO,

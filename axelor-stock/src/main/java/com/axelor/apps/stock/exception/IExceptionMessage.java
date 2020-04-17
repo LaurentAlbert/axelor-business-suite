@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -179,6 +179,8 @@ public interface IExceptionMessage {
   String LOGISTICAL_FORM_MISSING_TEMPLATE = /*$$(*/
       "The template to send message on save is missing." /*)*/;
 
+  String LOGISTICAL_FORM_INVALID_DIMENSIONS = /*$$(*/ "Invalid field dimensions" /*)*/;
+
   String CANCEL_REASON_MISSING = /*$$(*/ "A cancel reason must be selected" /*)*/;
   String CANCEL_REASON_BAD_TYPE = /*$$(*/
       "The type of cancel reason doesn't match with stock move" /*)*/;
@@ -203,5 +205,5 @@ public interface IExceptionMessage {
       "Incorrect product for stock correction" /*)*/;
 
   public static final String STOCK_CORRECTION_2 = /*$$(*/
-      "No stock move generated.Please verify stock correction details." /*)*/;
+      "No stock correction needed, current quantity in stock equals real quantity." /*)*/;
 }

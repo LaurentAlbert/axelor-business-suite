@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -38,14 +38,17 @@ public class BankReconciliationCreateService {
 
   protected BankReconciliationRepository bankReconciliationRepository;
   protected CompanyRepository companyRepository;
+  protected BankReconciliationService bankReconciliationService;
 
   @Inject
   public BankReconciliationCreateService(
       BankReconciliationRepository bankReconciliationRepository,
-      CompanyRepository companyRepository) {
+      CompanyRepository companyRepository,
+      BankReconciliationService bankReconciliationService) {
 
     this.bankReconciliationRepository = bankReconciliationRepository;
     this.companyRepository = companyRepository;
+    this.bankReconciliationService = bankReconciliationService;
   }
 
   @Transactional(rollbackOn = {Exception.class})
@@ -68,7 +71,7 @@ public class BankReconciliationCreateService {
       Company company =
           companyRepository
               .all()
-              .filter("?1 member of self.bankDetailsSet", bankDetails)
+              .filter("?1 member of self.bankDetailsList", bankDetails)
               .fetchOne();
 
       Currency currency = bankDetails.getCurrency();
@@ -120,6 +123,8 @@ public class BankReconciliationCreateService {
     bankReconciliation.setBankDetails(bankDetails);
     bankReconciliation.setBankStatement(bankStatement);
     bankReconciliation.setName(this.computeName(bankReconciliation));
+    bankReconciliation.setJournal(bankReconciliationService.getJournal(bankReconciliation));
+    bankReconciliation.setCashAccount(bankReconciliationService.getCashAccount(bankReconciliation));
 
     return bankReconciliation;
   }
