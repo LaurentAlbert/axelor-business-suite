@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -31,7 +31,7 @@ import com.axelor.apps.base.service.app.AppBaseService;
 import com.axelor.db.JPA;
 import com.axelor.db.Query;
 import com.axelor.exception.AxelorException;
-import com.axelor.exception.db.IException;
+import com.axelor.exception.db.repo.ExceptionOriginRepository;
 import com.axelor.exception.service.TraceBackService;
 import com.axelor.inject.Beans;
 import com.google.common.base.Function;
@@ -70,7 +70,7 @@ public class BatchDirectDebitCustomerInvoice extends BatchDirectDebit {
     LocalDate dueDate =
         accountingBatch.getDueDate() != null
             ? accountingBatch.getDueDate()
-            : Beans.get(AppBaseService.class).getTodayDate();
+            : Beans.get(AppBaseService.class).getTodayDate(accountingBatch.getCompany());
     filterList.add("self.dueDate <= :dueDate");
     bindingList.add(Pair.of("dueDate", (Object) dueDate));
 
@@ -82,14 +82,17 @@ public class BatchDirectDebitCustomerInvoice extends BatchDirectDebit {
     filterList.add(
         "self.partner.id NOT IN (SELECT DISTINCT partner.id FROM Partner partner LEFT JOIN partner.blockingList blocking WHERE blocking.blockingSelect = :blockingSelect AND blocking.blockingToDate >= :blockingToDate)");
     bindingList.add(Pair.of("blockingSelect", BlockingRepository.DEBIT_BLOCKING));
-    bindingList.add(Pair.of("blockingToDate", Beans.get(AppBaseService.class).getTodayDate()));
+    bindingList.add(
+        Pair.of(
+            "blockingToDate",
+            Beans.get(AppBaseService.class).getTodayDate(accountingBatch.getCompany())));
 
     if (accountingBatch.getBankDetails() != null) {
       Set<BankDetails> bankDetailsSet = Sets.newHashSet(accountingBatch.getBankDetails());
 
       if (accountingBatch.getIncludeOtherBankAccounts()
           && appBaseService.getAppBase().getManageMultiBanks()) {
-        bankDetailsSet.addAll(accountingBatch.getCompany().getBankDetailsSet());
+        bankDetailsSet.addAll(accountingBatch.getCompany().getBankDetailsList());
       }
 
       filterList.add("self.companyBankDetails IN (:bankDetailsSet)");
@@ -109,7 +112,7 @@ public class BatchDirectDebitCustomerInvoice extends BatchDirectDebit {
             Beans.get(BankOrderMergeService.class).mergeFromInvoicePayments(invoicePaymentList);
         findBatch().setBankOrder(bankOrder);
       } catch (AxelorException e) {
-        TraceBackService.trace(e, IException.DIRECT_DEBIT, batch.getId());
+        TraceBackService.trace(e, ExceptionOriginRepository.DIRECT_DEBIT, batch.getId());
         LOG.error(e.getMessage());
       }
     }
@@ -169,7 +172,7 @@ public class BatchDirectDebitCustomerInvoice extends BatchDirectDebit {
           incrementAnomaly();
           anomalyList.add(invoice.getId());
           query.bind("anomalyList", anomalyList);
-          TraceBackService.trace(e, IException.DIRECT_DEBIT, batch.getId());
+          TraceBackService.trace(e, ExceptionOriginRepository.DIRECT_DEBIT, batch.getId());
           LOG.error(e.getMessage());
           break;
         }

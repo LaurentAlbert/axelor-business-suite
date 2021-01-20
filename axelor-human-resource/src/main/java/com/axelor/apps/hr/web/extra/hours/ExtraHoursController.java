@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -36,22 +36,18 @@ import com.axelor.exception.AxelorException;
 import com.axelor.exception.service.TraceBackService;
 import com.axelor.i18n.I18n;
 import com.axelor.inject.Beans;
+import com.axelor.meta.CallMethod;
 import com.axelor.meta.schema.actions.ActionView;
 import com.axelor.meta.schema.actions.ActionView.ActionViewBuilder;
 import com.axelor.rpc.ActionRequest;
 import com.axelor.rpc.ActionResponse;
-import com.google.inject.Inject;
-import com.google.inject.Provider;
 import com.google.inject.Singleton;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Singleton
 public class ExtraHoursController {
-
-  @Inject private Provider<HRMenuTagService> hrMenuTagServiceProvider;
-  @Inject private Provider<ExtraHoursRepository> extraHoursRepositoryProvider;
-  @Inject private Provider<ExtraHoursService> extraHoursServiceProvider;
 
   public void editExtraHours(ActionRequest request, ActionResponse response) {
     List<ExtraHours> extraHoursList =
@@ -60,7 +56,7 @@ public class ExtraHoursController {
             .filter(
                 "self.user = ?1 AND self.company = ?2 AND self.statusSelect = 1",
                 AuthUtils.getUser(),
-                AuthUtils.getUser().getActiveCompany())
+                Optional.ofNullable(AuthUtils.getUser()).map(User::getActiveCompany).orElse(null))
             .fetch();
     if (extraHoursList.isEmpty()) {
       response.setView(
@@ -101,7 +97,8 @@ public class ExtraHoursController {
         ActionView.define(I18n.get("Extra hours to Validate"))
             .model(ExtraHours.class.getName())
             .add("grid", "extra-hours-validate-grid")
-            .add("form", "extra-hours-form");
+            .add("form", "extra-hours-form")
+            .param("search-filters", "extra-hours-filters");
 
     Beans.get(HRMenuValidateService.class).createValidateDomain(user, employee, actionView);
 
@@ -131,7 +128,8 @@ public class ExtraHoursController {
         ActionView.define(I18n.get("Historic colleague extra hours"))
             .model(ExtraHours.class.getName())
             .add("grid", "extra-hours-grid")
-            .add("form", "extra-hours-form");
+            .add("form", "extra-hours-form")
+            .param("search-filters", "extra-hours-filters");
 
     actionView
         .domain(
@@ -156,7 +154,8 @@ public class ExtraHoursController {
         ActionView.define(I18n.get("Extra hours to be Validated by your subordinates"))
             .model(ExtraHours.class.getName())
             .add("grid", "extra-hours-grid")
-            .add("form", "extra-hours-form");
+            .add("form", "extra-hours-form")
+            .param("search-filters", "extra-hours-filters");
 
     String domain =
         "self.user.employee.managerUser.employee.managerUser = :_user AND self.company = :_activeCompany AND self.statusSelect = 2";
@@ -181,11 +180,10 @@ public class ExtraHoursController {
   }
 
   /* Count Tags displayed on the menu items */
-
+  @CallMethod
   public String extraHoursValidateMenuTag() {
 
-    return hrMenuTagServiceProvider
-        .get()
+    return Beans.get(HRMenuTagService.class)
         .countRecordsTag(ExtraHours.class, ExtraHoursRepository.STATUS_CONFIRMED);
   }
 
@@ -194,12 +192,10 @@ public class ExtraHoursController {
 
     try {
       ExtraHours extraHours = request.getContext().asType(ExtraHours.class);
-      extraHours = extraHoursRepositoryProvider.get().find(extraHours.getId());
-      ExtraHoursService extraHoursService = extraHoursServiceProvider.get();
+      extraHours = Beans.get(ExtraHoursRepository.class).find(extraHours.getId());
+      Beans.get(ExtraHoursService.class).confirm(extraHours);
 
-      extraHoursService.confirm(extraHours);
-
-      Message message = extraHoursService.sendConfirmationEmail(extraHours);
+      Message message = Beans.get(ExtraHoursService.class).sendConfirmationEmail(extraHours);
       if (message != null && message.getStatusSelect() == MessageRepository.STATUS_SENT) {
         response.setFlash(
             String.format(
@@ -225,12 +221,10 @@ public class ExtraHoursController {
 
     try {
       ExtraHours extraHours = request.getContext().asType(ExtraHours.class);
-      extraHours = extraHoursRepositoryProvider.get().find(extraHours.getId());
-      ExtraHoursService extraHoursService = extraHoursServiceProvider.get();
+      extraHours = Beans.get(ExtraHoursRepository.class).find(extraHours.getId());
+      Beans.get(ExtraHoursService.class).validate(extraHours);
 
-      extraHoursService.validate(extraHours);
-
-      Message message = extraHoursService.sendValidationEmail(extraHours);
+      Message message = Beans.get(ExtraHoursService.class).sendValidationEmail(extraHours);
       if (message != null && message.getStatusSelect() == MessageRepository.STATUS_SENT) {
         response.setFlash(
             String.format(
@@ -252,12 +246,10 @@ public class ExtraHoursController {
 
     try {
       ExtraHours extraHours = request.getContext().asType(ExtraHours.class);
-      extraHours = extraHoursRepositoryProvider.get().find(extraHours.getId());
-      ExtraHoursService extraHoursService = extraHoursServiceProvider.get();
+      extraHours = Beans.get(ExtraHoursRepository.class).find(extraHours.getId());
+      Beans.get(ExtraHoursService.class).refuse(extraHours);
 
-      extraHoursService.refuse(extraHours);
-
-      Message message = extraHoursService.sendRefusalEmail(extraHours);
+      Message message = Beans.get(ExtraHoursService.class).sendRefusalEmail(extraHours);
       if (message != null && message.getStatusSelect() == MessageRepository.STATUS_SENT) {
         response.setFlash(
             String.format(
@@ -276,12 +268,10 @@ public class ExtraHoursController {
   public void cancel(ActionRequest request, ActionResponse response) throws AxelorException {
     try {
       ExtraHours extraHours = request.getContext().asType(ExtraHours.class);
-      extraHours = extraHoursRepositoryProvider.get().find(extraHours.getId());
-      ExtraHoursService extraHoursService = extraHoursServiceProvider.get();
+      extraHours = Beans.get(ExtraHoursRepository.class).find(extraHours.getId());
+      Beans.get(ExtraHoursService.class).cancel(extraHours);
 
-      extraHoursService.cancel(extraHours);
-
-      Message message = extraHoursService.sendCancellationEmail(extraHours);
+      Message message = Beans.get(ExtraHoursService.class).sendCancellationEmail(extraHours);
       if (message != null && message.getStatusSelect() == MessageRepository.STATUS_SENT) {
         response.setFlash(
             String.format(
@@ -299,8 +289,7 @@ public class ExtraHoursController {
   public void compute(ActionRequest request, ActionResponse response) {
     try {
       ExtraHours extraHours = request.getContext().asType(ExtraHours.class);
-      ExtraHoursService extraHoursService = extraHoursServiceProvider.get();
-      extraHoursService.compute(extraHours);
+      Beans.get(ExtraHoursService.class).compute(extraHours);
       response.setValue("totalQty", extraHours.getTotalQty());
     } catch (Exception e) {
       TraceBackService.trace(response, e);

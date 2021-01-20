@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -17,6 +17,7 @@
  */
 package com.axelor.apps.base.service;
 
+import com.axelor.apps.base.db.Company;
 import com.axelor.apps.base.db.Product;
 import com.axelor.apps.base.db.ProductVariant;
 import com.axelor.apps.base.db.ProductVariantConfig;
@@ -27,26 +28,18 @@ import java.math.BigDecimal;
 
 public interface ProductService {
 
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
-  public void updateProductPrice(Product product);
+  @Transactional
+  public void updateProductPrice(Product product) throws AxelorException;
 
   public String getSequence() throws AxelorException;
 
-  /**
-   * Retourne le prix d'un produit à une date t.
-   *
-   * @param product
-   * @param date
-   * @return
-   */
-  public BigDecimal getPrice(Product product, boolean isPurchase);
+  public void updateSalePrice(Product product, Company company) throws AxelorException;
 
-  public void updateSalePrice(Product product);
+  @Transactional
+  public void generateProductVariants(Product productModel) throws AxelorException;
 
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
-  public void generateProductVariants(Product productModel);
-
-  public Product createProduct(Product productModel, ProductVariant productVariant, int seq);
+  public Product createProduct(Product productModel, ProductVariant productVariant, int seq)
+      throws AxelorException;
 
   /**
    * @param productVariant

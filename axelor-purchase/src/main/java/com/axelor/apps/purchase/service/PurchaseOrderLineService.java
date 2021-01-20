@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -42,11 +42,8 @@ public interface PurchaseOrderLineService {
       PurchaseOrder purchaseOrder, PurchaseOrderLine purchaseOrderLine, TaxLine taxLine)
       throws AxelorException;
 
-  public BigDecimal getMinSalePrice(
+  public BigDecimal getPurchaseMaxPrice(
       PurchaseOrder purchaseOrder, PurchaseOrderLine purchaseOrderLine) throws AxelorException;
-
-  public BigDecimal getSalePrice(PurchaseOrder purchaseOrder, Product product, BigDecimal price)
-      throws AxelorException;
 
   public TaxLine getTaxLine(PurchaseOrder purchaseOrder, PurchaseOrderLine purchaseOrderLine)
       throws AxelorException;
@@ -66,7 +63,8 @@ public interface PurchaseOrderLineService {
   public BigDecimal getCompanyExTaxTotal(BigDecimal exTaxTotal, PurchaseOrder purchaseOrder)
       throws AxelorException;
 
-  public PriceListLine getPriceListLine(PurchaseOrderLine purchaseOrderLine, PriceList priceList);
+  public PriceListLine getPriceListLine(
+      PurchaseOrderLine purchaseOrderLine, PriceList priceList, BigDecimal price);
 
   public Map<String, BigDecimal> compute(
       PurchaseOrderLine purchaseOrderLine, PurchaseOrder purchaseOrder) throws AxelorException;
@@ -82,10 +80,11 @@ public interface PurchaseOrderLineService {
       Unit unit)
       throws AxelorException;
 
-  public BigDecimal getQty(PurchaseOrder purchaseOrder, PurchaseOrderLine purchaseOrderLine);
+  public BigDecimal getQty(PurchaseOrder purchaseOrder, PurchaseOrderLine purchaseOrderLine)
+      throws AxelorException;
 
   public SupplierCatalog getSupplierCatalog(
-      PurchaseOrder purchaseOrder, PurchaseOrderLine purchaseOrderLine);
+      PurchaseOrder purchaseOrder, PurchaseOrderLine purchaseOrderLine) throws AxelorException;
 
   public BigDecimal convertUnitPrice(Boolean priceIsAti, TaxLine taxLine, BigDecimal price);
 
@@ -96,7 +95,7 @@ public interface PurchaseOrderLineService {
       PurchaseOrder purchaseOrder, PurchaseOrderLine purchaseOrderLine, BigDecimal price);
 
   public int getDiscountTypeSelect(
-      PurchaseOrderLine purchaseOrderLine, PurchaseOrder purchaseOrder);
+      PurchaseOrderLine purchaseOrderLine, PurchaseOrder purchaseOrder, BigDecimal price);
 
   public Unit getPurchaseUnit(PurchaseOrderLine purchaseOrderLine);
 
@@ -107,13 +106,15 @@ public interface PurchaseOrderLineService {
    * @param purchaseOrderLine
    * @return
    */
-  public BigDecimal getMinQty(PurchaseOrder purchaseOrder, PurchaseOrderLine purchaseOrderLine);
+  public BigDecimal getMinQty(PurchaseOrder purchaseOrder, PurchaseOrderLine purchaseOrderLine)
+      throws AxelorException;
 
   public void checkMinQty(
       PurchaseOrder purchaseOrder,
       PurchaseOrderLine purchaseOrderLine,
       ActionRequest request,
-      ActionResponse response);
+      ActionResponse response)
+      throws AxelorException;
 
   public void checkMultipleQty(PurchaseOrderLine purchaseOrderLine, ActionResponse response);
 

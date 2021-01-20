@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 
 public final class StringTool {
@@ -253,7 +254,7 @@ public final class StringTool {
    * @return list of integers
    */
   public static List<Integer> getIntegerList(String string) {
-    return string != null
+    return string != null && !"".equals(string)
         ? Arrays.stream(string.split("\\D+")).map(Integer::valueOf).collect(Collectors.toList())
         : new ArrayList<>();
   }
@@ -268,7 +269,7 @@ public final class StringTool {
   public static String getIdListString(Collection<? extends Model> collection) {
     List<Long> idList = new ArrayList<>();
     String idString;
-    if (collection.isEmpty()) {
+    if (CollectionUtils.isEmpty(collection)) {
       idString = "0";
     } else {
       for (Model item : collection) {

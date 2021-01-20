@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -19,7 +19,6 @@ package com.axelor.apps.stock.service;
 
 import com.axelor.app.AppSettings;
 import com.axelor.apps.base.db.Company;
-import com.axelor.apps.base.db.IAdministration;
 import com.axelor.apps.base.db.Product;
 import com.axelor.apps.base.db.ProductCategory;
 import com.axelor.apps.base.db.ProductFamily;
@@ -57,6 +56,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.lang.invoke.MethodHandles;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
@@ -69,6 +69,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -119,7 +120,8 @@ public class InventoryService {
   }
 
   public Inventory createInventory(
-      LocalDate date,
+      LocalDate plannedStartDate,
+      LocalDate plannedEndDate,
       String description,
       StockLocation stockLocation,
       boolean excludeOutOfStock,
@@ -138,11 +140,13 @@ public class InventoryService {
 
     inventory.setInventorySeq(this.getInventorySequence(stockLocation.getCompany()));
 
-    inventory.setDateT(date.atStartOfDay(ZoneOffset.UTC));
+    inventory.setPlannedStartDateT(plannedStartDate.atStartOfDay(ZoneOffset.UTC));
+
+    inventory.setPlannedEndDateT(plannedEndDate.atStartOfDay(ZoneOffset.UTC));
 
     inventory.setDescription(description);
 
-    inventory.setFormatSelect(IAdministration.PDF);
+    inventory.setFormatSelect(InventoryRepository.FORMAT_PDF);
 
     inventory.setStockLocation(stockLocation);
 
@@ -170,7 +174,7 @@ public class InventoryService {
     return ref;
   }
 
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public Path importFile(Inventory inventory) throws AxelorException {
 
     List<InventoryLine> inventoryLineList = inventory.getInventoryLineList();
@@ -204,9 +208,17 @@ public class InventoryService {
 
       String description = line[6].replace("\"", "");
 
-      if (inventoryLineMap.containsKey(code)) {
-        inventoryLineMap.get(code).setRealQty(realQty);
-        inventoryLineMap.get(code).setDescription(description);
+      int qtyScale = Beans.get(AppBaseService.class).getAppBase().getNbDecimalDigitForQty();
+      String key = code + trackingNumberSeq;
+
+      if (inventoryLineMap.containsKey(key)) {
+        InventoryLine inventoryLine = inventoryLineMap.get(key);
+        inventoryLine.setRealQty(realQty.setScale(qtyScale, RoundingMode.HALF_EVEN));
+        inventoryLine.setDescription(description);
+
+        if (inventoryLine.getTrackingNumber() != null) {
+          inventoryLine.getTrackingNumber().setCounter(realQty);
+        }
       } else {
         BigDecimal currentQty;
         try {
@@ -221,7 +233,11 @@ public class InventoryService {
 
         InventoryLine inventoryLine = new InventoryLine();
         List<Product> productList =
-            productRepo.all().filter("self.code = :code").bind("code", code).fetch();
+            productRepo
+                .all()
+                .filter("self.code = :code AND dtype = 'Product'")
+                .bind("code", code)
+                .fetch();
         if (productList != null && !productList.isEmpty()) {
           if (productList.size() > 1) {
             throw new AxelorException(
@@ -240,10 +256,11 @@ public class InventoryService {
         inventoryLine.setProduct(product);
         inventoryLine.setInventory(inventory);
         inventoryLine.setRack(rack);
-        inventoryLine.setCurrentQty(currentQty);
-        inventoryLine.setRealQty(realQty);
+        inventoryLine.setCurrentQty(currentQty.setScale(qtyScale, RoundingMode.HALF_EVEN));
+        inventoryLine.setRealQty(realQty.setScale(qtyScale, RoundingMode.HALF_EVEN));
         inventoryLine.setDescription(description);
-        inventoryLine.setTrackingNumber(this.getTrackingNumber(trackingNumberSeq));
+        inventoryLine.setTrackingNumber(
+            this.getTrackingNumber(trackingNumberSeq, product, realQty));
         inventoryLineList.add(inventoryLine);
       }
     }
@@ -295,22 +312,37 @@ public class InventoryService {
     return inventoryLineMap;
   }
 
-  public TrackingNumber getTrackingNumber(String sequence) {
+  public TrackingNumber getTrackingNumber(String sequence, Product product, BigDecimal realQty) {
 
-    if (sequence != null && !sequence.isEmpty()) {
-      return trackingNumberRepository.findBySeq(sequence);
+    TrackingNumber trackingNumber = null;
+
+    if (!StringUtils.isEmpty(sequence)) {
+      trackingNumber =
+          trackingNumberRepository
+              .all()
+              .filter("self.trackingNumberSeq = ?1 and self.product = ?2", sequence, product)
+              .fetchOne();
+
+      if (trackingNumber == null) {
+        trackingNumber = new TrackingNumber();
+        trackingNumber.setTrackingNumberSeq(sequence);
+        trackingNumber.setProduct(product);
+        trackingNumber.setCounter(realQty);
+      }
     }
-    return null;
+
+    return trackingNumber;
   }
 
   @Transactional(rollbackOn = {Exception.class})
   public void validateInventory(Inventory inventory) throws AxelorException {
+
+    inventory.setValidatedOn(appBaseService.getTodayDate(inventory.getCompany()));
+    inventory.setStatusSelect(InventoryRepository.STATUS_VALIDATED);
+    inventory.setValidatedBy(AuthUtils.getUser());
     generateStockMove(inventory, true);
     generateStockMove(inventory, false);
     storeLastInventoryData(inventory);
-    inventory.setStatusSelect(InventoryRepository.STATUS_VALIDATED);
-    inventory.setValidatedBy(AuthUtils.getUser());
-    inventory.setValidatedOn(appBaseService.getTodayDate());
   }
 
   private void storeLastInventoryData(Inventory inventory) {
@@ -344,7 +376,8 @@ public class InventoryService {
         BigDecimal realQty = consolidatedRealQties.get(product);
         if (realQty != null) {
           stockLocationLine.setLastInventoryRealQty(realQty);
-          stockLocationLine.setLastInventoryDateT(inventory.getDateT());
+          stockLocationLine.setLastInventoryDateT(
+              inventory.getValidatedOn().atStartOfDay().atZone(ZoneOffset.UTC));
         }
 
         String rack = realRacks.get(product);
@@ -364,7 +397,8 @@ public class InventoryService {
         BigDecimal realQty = realQties.get(Pair.of(product, trackingNumber));
         if (realQty != null) {
           detailsStockLocationLine.setLastInventoryRealQty(realQty);
-          detailsStockLocationLine.setLastInventoryDateT(inventory.getDateT());
+          detailsStockLocationLine.setLastInventoryDateT(
+              inventory.getValidatedOn().atStartOfDay().atZone(ZoneOffset.UTC));
         }
 
         String rack = realRacks.get(product);
@@ -404,7 +438,8 @@ public class InventoryService {
 
     String inventorySeq = inventory.getInventorySeq();
 
-    LocalDate inventoryDate = inventory.getDateT().toLocalDate();
+    LocalDate inventoryDate = inventory.getPlannedStartDateT().toLocalDate();
+    LocalDate realDate = inventory.getValidatedOn();
     StockMove stockMove =
         stockMoveService.createStockMove(
             null,
@@ -412,7 +447,7 @@ public class InventoryService {
             company,
             fromStockLocation,
             toStockLocation,
-            inventoryDate,
+            realDate,
             inventoryDate,
             null,
             StockMoveRepository.TYPE_INTERNAL);
@@ -490,7 +525,7 @@ public class InventoryService {
     }
   }
 
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public void cancel(Inventory inventory) throws AxelorException {
     List<StockMove> stockMoveList =
         stockMoveRepo
@@ -507,7 +542,7 @@ public class InventoryService {
     inventory.setStatusSelect(InventoryRepository.STATUS_CANCELED);
   }
 
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public Boolean fillInventoryLineList(Inventory inventory) throws AxelorException {
 
     if (inventory.getStockLocation() == null) {
@@ -563,7 +598,7 @@ public class InventoryService {
 
     if (!inventory.getIncludeObsolete()) {
       query += " and (self.product.endDate > ? or self.product.endDate is null)";
-      params.add(inventory.getDateT().toLocalDate());
+      params.add(inventory.getPlannedEndDateT().toLocalDate());
     }
 
     if (inventory.getProductFamily() != null) {
@@ -614,7 +649,7 @@ public class InventoryService {
     }
   }
 
-  @Transactional
+  @Transactional(rollbackOn = {Exception.class})
   public MetaFile exportInventoryAsCSV(Inventory inventory) throws IOException {
 
     List<String[]> list = new ArrayList<>();
@@ -702,5 +737,12 @@ public class InventoryService {
             StockMoveRepository.ORIGIN_INVENTORY,
             inventory.getId())
         .fetch();
+  }
+
+  public String computeTitle(Inventory entity) {
+    return entity.getStockLocation().getName()
+        + (!Strings.isNullOrEmpty(entity.getDescription())
+            ? "-" + StringUtils.abbreviate(entity.getDescription(), 10)
+            : "");
   }
 }

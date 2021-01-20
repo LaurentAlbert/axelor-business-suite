@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -28,6 +28,7 @@ import com.axelor.apps.account.db.repo.InvoicePaymentRepository;
 import com.axelor.apps.account.db.repo.InvoiceRepository;
 import com.axelor.apps.account.db.repo.ReconcileRepository;
 import com.axelor.apps.account.exception.IExceptionMessage;
+import com.axelor.apps.account.service.app.AppAccountService;
 import com.axelor.apps.base.db.BankDetails;
 import com.axelor.apps.base.db.Company;
 import com.axelor.apps.base.db.Currency;
@@ -243,13 +244,13 @@ public class InvoicePaymentCreateServiceImpl implements InvoicePaymentCreateServ
   }
 
   @Override
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional
   public InvoicePayment createInvoicePayment(Invoice invoice, BankDetails companyBankDetails) {
     InvoicePayment invoicePayment =
         createInvoicePayment(
             invoice,
             invoice.getInTaxTotal().subtract(invoice.getAmountPaid()),
-            appBaseService.getTodayDate(),
+            appBaseService.getTodayDate(invoice.getCompany()),
             invoice.getCurrency(),
             invoice.getPaymentMode(),
             InvoicePaymentRepository.TYPE_PAYMENT);
@@ -257,7 +258,7 @@ public class InvoicePaymentCreateServiceImpl implements InvoicePaymentCreateServ
     return invoicePaymentRepository.save(invoicePayment);
   }
 
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional
   public InvoicePayment createInvoicePayment(
       Invoice invoice,
       PaymentMode paymentMode,
@@ -280,7 +281,7 @@ public class InvoicePaymentCreateServiceImpl implements InvoicePaymentCreateServ
   }
 
   @Override
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public List<InvoicePayment> createMassInvoicePayment(
       List<Long> invoiceList,
       PaymentMode paymentMode,
@@ -296,14 +297,13 @@ public class InvoicePaymentCreateServiceImpl implements InvoicePaymentCreateServ
 
     for (Long invoiceId : invoiceList) {
 
-      invoicePaymentList.add(
+      Invoice invoice = invoiceRepository.find(invoiceId);
+      InvoicePayment invoicePayment =
           this.createInvoicePayment(
-              invoiceRepository.find(invoiceId),
-              paymentMode,
-              companyBankDetails,
-              paymentDate,
-              bankDepositDate,
-              chequeNumber));
+              invoice, paymentMode, companyBankDetails, paymentDate, bankDepositDate, chequeNumber);
+      invoicePaymentList.add(invoicePayment);
+      invoice.addInvoicePaymentListItem(invoicePayment);
+      invoicePaymentToolService.updateAmountPaid(invoice);
     }
 
     return invoicePaymentList;
@@ -314,6 +314,9 @@ public class InvoicePaymentCreateServiceImpl implements InvoicePaymentCreateServ
     Company company = null;
     Currency currency = null;
     List<Long> invoiceToPay = new ArrayList<>();
+    Boolean isActivatePassedForPayment =
+        Beans.get(AppAccountService.class).getAppAccount().getActivatePassedForPayment();
+
     for (Long invoiceId : invoiceIdList) {
       Invoice invoice = Beans.get(InvoiceRepository.class).find(invoiceId);
 
@@ -351,6 +354,12 @@ public class InvoicePaymentCreateServiceImpl implements InvoicePaymentCreateServ
         throw new AxelorException(
             TraceBackRepository.CATEGORY_INCONSISTENCY,
             I18n.get(IExceptionMessage.INVOICE_MERGE_ERROR_CURRENCY));
+      }
+      if (isActivatePassedForPayment
+          && invoice.getPfpValidateStatusSelect() != InvoiceRepository.PFP_STATUS_VALIDATED) {
+        throw new AxelorException(
+            TraceBackRepository.CATEGORY_INCONSISTENCY,
+            I18n.get(IExceptionMessage.INVOICE_MASS_PAYMENT_ERROR_PFP_LITIGATION));
       }
       invoiceToPay.add(invoiceId);
     }

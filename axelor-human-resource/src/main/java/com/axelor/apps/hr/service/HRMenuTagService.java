@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -34,21 +34,23 @@ public class HRMenuTagService {
 
     User user = AuthUtils.getUser();
     Employee employee = user.getEmployee();
+    String filter = "self.statusSelect = :_statusSelect";
 
     if (employee != null && employee.getHrManager()) {
 
       return Long.toString(
-          JPA.all(modelConcerned)
-              .filter("self.statusSelect = :_statusSelect")
-              .bind("_statusSelect", status)
-              .count());
+          JPA.all(modelConcerned).filter(filter).bind("_statusSelect", status).count());
 
     } else {
 
+      filter +=
+          (employee == null || employee.getManagerUser() == null)
+              ? " AND (self.user.id = :_userId OR self.user.employee.managerUser.id = :_userId)"
+              : " AND self.user.employee.managerUser.id = :_userId";
+
       return Long.toString(
           JPA.all(modelConcerned)
-              .filter(
-                  "self.user.employee.managerUser.id = :_userId AND self.statusSelect = :_statusSelect")
+              .filter(filter)
               .bind("_userId", user.getId())
               .bind("_statusSelect", status)
               .count());

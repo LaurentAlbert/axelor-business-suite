@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -19,6 +19,7 @@ package com.axelor.apps.supplychain.service;
 
 import com.axelor.apps.account.db.AnalyticDistributionTemplate;
 import com.axelor.apps.account.db.AnalyticMoveLine;
+import com.axelor.apps.account.db.BudgetDistribution;
 import com.axelor.apps.account.db.repo.AnalyticMoveLineRepository;
 import com.axelor.apps.account.service.AnalyticMoveLineService;
 import com.axelor.apps.account.service.app.AppAccountService;
@@ -31,17 +32,22 @@ import com.axelor.apps.purchase.db.PurchaseOrderLine;
 import com.axelor.apps.purchase.service.PurchaseOrderLineServiceImpl;
 import com.axelor.apps.sale.db.SaleOrderLine;
 import com.axelor.apps.sale.db.repo.SaleOrderLineRepository;
+import com.axelor.auth.AuthUtils;
+import com.axelor.auth.db.User;
 import com.axelor.exception.AxelorException;
+import com.axelor.inject.Beans;
 import com.google.common.base.Preconditions;
 import com.google.inject.Inject;
 import java.lang.invoke.MethodHandles;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class PurchaseOrderLineServiceSupplychainImpl extends PurchaseOrderLineServiceImpl {
+public class PurchaseOrderLineServiceSupplychainImpl extends PurchaseOrderLineServiceImpl
+    implements PurchaseOrderLineServiceSupplyChain {
 
   @Inject protected AnalyticMoveLineService analyticMoveLineService;
 
@@ -153,7 +159,8 @@ public class PurchaseOrderLineServiceSupplychainImpl extends PurchaseOrderLineSe
     if ((analyticMoveLineList == null || analyticMoveLineList.isEmpty())) {
       createAnalyticDistributionWithTemplate(purchaseOrderLine);
     } else {
-      LocalDate date = appAccountService.getTodayDate();
+      LocalDate date =
+          appAccountService.getTodayDate(purchaseOrderLine.getPurchaseOrder().getCompany());
       for (AnalyticMoveLine analyticMoveLine : analyticMoveLineList) {
         analyticMoveLineService.updateAnalyticMoveLine(
             analyticMoveLine, purchaseOrderLine.getCompanyExTaxTotal(), date);
@@ -170,7 +177,12 @@ public class PurchaseOrderLineServiceSupplychainImpl extends PurchaseOrderLineSe
             purchaseOrderLine.getAnalyticDistributionTemplate(),
             purchaseOrderLine.getExTaxTotal(),
             AnalyticMoveLineRepository.STATUS_FORECAST_ORDER,
-            appBaseService.getTodayDate());
+            appBaseService.getTodayDate(
+                purchaseOrderLine.getPurchaseOrder() != null
+                    ? purchaseOrderLine.getPurchaseOrder().getCompany()
+                    : Optional.ofNullable(AuthUtils.getUser())
+                        .map(User::getActiveCompany)
+                        .orElse(null)));
 
     purchaseOrderLine.clearAnalyticMoveLineList();
     analyticMoveLineList.forEach(purchaseOrderLine::addAnalyticMoveLineListItem);
@@ -187,5 +199,23 @@ public class PurchaseOrderLineServiceSupplychainImpl extends PurchaseOrderLineSe
       return undeliveryQty;
     }
     return BigDecimal.ZERO;
+  }
+
+  public void computeBudgetDistributionSumAmount(
+      PurchaseOrderLine purchaseOrderLine, PurchaseOrder purchaseOrder) {
+    List<BudgetDistribution> budgetDistributionList = purchaseOrderLine.getBudgetDistributionList();
+    BigDecimal budgetDistributionSumAmount = BigDecimal.ZERO;
+    LocalDate computeDate = purchaseOrder.getOrderDate();
+
+    if (budgetDistributionList != null && !budgetDistributionList.isEmpty()) {
+
+      for (BudgetDistribution budgetDistribution : budgetDistributionList) {
+        budgetDistributionSumAmount =
+            budgetDistributionSumAmount.add(budgetDistribution.getAmount());
+        Beans.get(BudgetSupplychainService.class)
+            .computeBudgetDistributionSumAmount(budgetDistribution, computeDate);
+      }
+    }
+    purchaseOrderLine.setBudgetDistributionSumAmount(budgetDistributionSumAmount);
   }
 }

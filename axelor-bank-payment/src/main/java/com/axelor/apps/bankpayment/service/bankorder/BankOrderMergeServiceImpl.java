@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -38,8 +38,8 @@ import com.axelor.exception.AxelorException;
 import com.axelor.exception.db.repo.TraceBackRepository;
 import com.axelor.i18n.I18n;
 import com.axelor.inject.Beans;
-import com.beust.jcommander.internal.Lists;
 import com.google.common.base.Strings;
+import com.google.common.collect.Lists;
 import com.google.inject.Inject;
 import com.google.inject.persist.Transactional;
 import java.lang.invoke.MethodHandles;
@@ -79,7 +79,7 @@ public class BankOrderMergeServiceImpl implements BankOrderMergeService {
     this.paymentScheduleLineRepository = paymentScheduleLineRepository;
   }
 
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public BankOrder mergeBankOrders(Collection<BankOrder> bankOrders) throws AxelorException {
 
     if (bankOrders == null || bankOrders.size() <= 1) {
@@ -96,7 +96,8 @@ public class BankOrderMergeServiceImpl implements BankOrderMergeService {
 
     bankOrder.setSenderLabel(null);
     bankOrder.setSenderReference(null);
-    bankOrder.setBankOrderDate(Beans.get(AppBaseService.class).getTodayDate());
+    bankOrder.setBankOrderDate(
+        Beans.get(AppBaseService.class).getTodayDate(bankOrder.getSenderCompany()));
     bankOrder.setSignatoryUser(null);
     bankOrder.setSignatoryEbicsUser(null);
 
@@ -249,9 +250,7 @@ public class BankOrderMergeServiceImpl implements BankOrderMergeService {
           consolidateBankOrderLine.setBankOrderLineOriginList(new ArrayList<>());
         }
         if (bankOrderLine.getBankOrderLineOriginList() != null) {
-          bankOrderLine
-              .getBankOrderLineOriginList()
-              .stream()
+          bankOrderLine.getBankOrderLineOriginList().stream()
               .forEach(consolidateBankOrderLine::addBankOrderLineOriginListItem);
         }
         consolidateBankOrderLine.setBankOrderAmount(
@@ -324,7 +323,7 @@ public class BankOrderMergeServiceImpl implements BankOrderMergeService {
   }
 
   @Override
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public BankOrder mergeFromInvoicePayments(Collection<InvoicePayment> invoicePayments)
       throws AxelorException {
 

@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -27,12 +27,9 @@ import com.axelor.rpc.ActionRequest;
 import com.axelor.rpc.ActionResponse;
 import com.axelor.studio.db.Filter;
 import com.axelor.studio.service.filter.FilterSqlService;
-import com.google.inject.Inject;
 import java.util.Map;
 
 public class FilterController {
-
-  @Inject private FilterSqlService filterSqlService;
 
   public void updateTargetField(ActionRequest request, ActionResponse response) {
 
@@ -55,7 +52,7 @@ public class FilterController {
           metaField.getLabel() != null && !metaField.getLabel().isEmpty()
               ? metaField.getLabel()
               : metaField.getName());
-    } else if (isJson && metaJson != null) {
+    } else if ((isJson || !isJson) && metaJson != null) {
       response.setValue("targetType", Inflector.getInstance().camelize(metaJson.getType()));
       response.setValue("targetField", metaJson.getName());
     } else {
@@ -70,6 +67,7 @@ public class FilterController {
       throws AxelorException {
 
     Filter filter = request.getContext().asType(Filter.class);
+    FilterSqlService filterSqlService = Beans.get(FilterSqlService.class);
 
     if (filter.getTargetField() == null) return;
 

@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -49,6 +49,9 @@ public class AssistantReportInvoiceController {
     String fileLink =
         ReportFactory.createReport(IReport.SALE_INVOICES_DETAILS, name + "-${date}")
             .addParam("Locale", ReportSettings.getPrintingLocale(null))
+            .addParam(
+                "Timezone",
+                assistant.getCompany() != null ? assistant.getCompany().getTimezone() : null)
             .addParam("assistantId", assistant.getId())
             .addParam("companyId", assistant.getCompany().getId())
             .addParam("graphType", assistant.getGraphTypeSelect().toString())
@@ -76,6 +79,9 @@ public class AssistantReportInvoiceController {
     String fileLink =
         ReportFactory.createReport(IReport.PURCHASE_INVOICES_DETAILS, name + "-${date}")
             .addParam("Locale", ReportSettings.getPrintingLocale(null))
+            .addParam(
+                "Timezone",
+                assistant.getCompany() != null ? assistant.getCompany().getTimezone() : null)
             .addParam("assistantId", assistant.getId())
             .addParam("companyId", assistant.getCompany().getId())
             .addParam("partnersIds", Joiner.on(",").join(assistant.getPartnerSet()))

@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -43,6 +43,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,6 +51,7 @@ public class MoveTemplateService {
   private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   protected MoveService moveService;
+  protected MoveValidateService moveValidateService;
   protected MoveRepository moveRepo;
   protected MoveLineService moveLineService;
   protected PartnerRepository partnerRepo;
@@ -61,12 +63,14 @@ public class MoveTemplateService {
   @Inject
   public MoveTemplateService(
       MoveService moveService,
+      MoveValidateService moveValidateService,
       MoveRepository moveRepo,
       MoveLineService moveLineService,
       PartnerRepository partnerRepo,
       AnalyticMoveLineService analyticMoveLineService,
       TaxService taxService) {
     this.moveService = moveService;
+    this.moveValidateService = moveValidateService;
     this.moveRepo = moveRepo;
     this.moveLineService = moveLineService;
     this.partnerRepo = partnerRepo;
@@ -86,7 +90,7 @@ public class MoveTemplateService {
   }
 
   @SuppressWarnings("unchecked")
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public List<Long> generateMove(
       MoveTemplateType moveTemplateType,
       MoveTemplate moveTemplate,
@@ -103,7 +107,7 @@ public class MoveTemplateService {
     return new ArrayList<>();
   }
 
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public List<Long> generateMove(MoveTemplate moveTemplate, List<HashMap<String, Object>> dataList)
       throws AxelorException {
     List<Long> moveList = new ArrayList<Long>();
@@ -129,78 +133,85 @@ public class MoveTemplateService {
                     ((HashMap<String, Object>) data.get("creditPartner")).get("id").toString()));
         partner = creditPartner;
       }
-      Move move =
-          moveService
-              .getMoveCreateService()
-              .createMove(
-                  moveTemplate.getJournal(),
-                  moveTemplate.getJournal().getCompany(),
-                  null,
+      if (moveTemplate.getJournal().getCompany() != null) {
+        Move move =
+            moveService
+                .getMoveCreateService()
+                .createMove(
+                    moveTemplate.getJournal(),
+                    moveTemplate.getJournal().getCompany(),
+                    null,
+                    partner,
+                    moveDate,
+                    null,
+                    MoveRepository.TECHNICAL_ORIGIN_TEMPLATE);
+        int counter = 1;
+
+        for (MoveTemplateLine moveTemplateLine : moveTemplate.getMoveTemplateLineList()) {
+          partner = null;
+          if (moveTemplateLine.getDebitCreditSelect().equals(MoveTemplateLineRepository.DEBIT)) {
+            isDebit = true;
+            if (moveTemplateLine.getHasPartnerToDebit()) {
+              partner = debitPartner;
+            }
+          } else if (moveTemplateLine
+              .getDebitCreditSelect()
+              .equals(MoveTemplateLineRepository.CREDIT)) {
+            isDebit = false;
+            if (moveTemplateLine.getHasPartnerToCredit()) {
+              partner = creditPartner;
+            }
+          }
+
+          BigDecimal amount =
+              moveBalance
+                  .multiply(moveTemplateLine.getPercentage())
+                  .divide(hundred, RoundingMode.HALF_EVEN);
+
+          MoveLine moveLine =
+              moveLineService.createMoveLine(
+                  move,
                   partner,
+                  moveTemplateLine.getAccount(),
+                  amount,
+                  isDebit,
                   moveDate,
-                  null,
-                  MoveRepository.TECHNICAL_ORIGIN_TEMPLATE);
-      int counter = 1;
+                  moveDate,
+                  counter,
+                  moveTemplate.getFullName(),
+                  moveTemplateLine.getName());
+          move.getMoveLineList().add(moveLine);
 
-      for (MoveTemplateLine moveTemplateLine : moveTemplate.getMoveTemplateLineList()) {
-        partner = null;
-        if (moveTemplateLine.getDebitCreditSelect().equals(MoveTemplateLineRepository.DEBIT)) {
-          isDebit = true;
-          if (moveTemplateLine.getHasPartnerToDebit()) {
-            partner = debitPartner;
+          Tax tax = moveTemplateLine.getTax();
+
+          if (tax != null) {
+            TaxLine taxLine = taxService.getTaxLine(tax, moveDate);
+            if (taxLine != null) {
+              moveLine.setTaxLine(taxLine);
+              moveLine.setTaxRate(taxLine.getValue());
+              moveLine.setTaxCode(tax.getCode());
+            }
           }
-        } else if (moveTemplateLine
-            .getDebitCreditSelect()
-            .equals(MoveTemplateLineRepository.CREDIT)) {
-          isDebit = false;
-          if (moveTemplateLine.getHasPartnerToCredit()) {
-            partner = creditPartner;
-          }
+
+          moveLine.setAnalyticDistributionTemplate(
+              moveTemplateLine.getAnalyticDistributionTemplate());
+          moveLineService.generateAnalyticMoveLines(moveLine);
+
+          counter++;
         }
 
-        BigDecimal amount =
-            moveBalance
-                .multiply(moveTemplateLine.getPercentage())
-                .divide(hundred, RoundingMode.HALF_EVEN);
-
-        MoveLine moveLine =
-            moveLineService.createMoveLine(
-                move,
-                partner,
-                moveTemplateLine.getAccount(),
-                amount,
-                isDebit,
-                moveDate,
-                moveDate,
-                counter,
-                moveTemplate.getFullName(),
-                moveTemplateLine.getName());
-        move.getMoveLineList().add(moveLine);
-
-        Tax tax = moveTemplateLine.getTax();
-
-        if (tax != null) {
-          TaxLine taxLine = taxService.getTaxLine(tax, moveDate);
-          if (taxLine != null) {
-            moveLine.setTaxLine(taxLine);
-            moveLine.setTaxRate(taxLine.getValue());
-            moveLine.setTaxCode(tax.getCode());
-          }
+        if (moveTemplate.getAutomaticallyValidate()) {
+          moveValidateService.validate(move);
         }
 
-        moveLine.setAnalyticDistributionTemplate(
-            moveTemplateLine.getAnalyticDistributionTemplate());
-        moveLineService.generateAnalyticMoveLines(moveLine);
-
-        counter++;
+        moveRepo.save(move);
+        moveList.add(move.getId());
       }
-      moveRepo.save(move);
-      moveList.add(move.getId());
     }
     return moveList;
   }
 
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public List<Long> generateMove(LocalDate moveDate, List<HashMap<String, Object>> moveTemplateList)
       throws AxelorException {
     List<Long> moveList = new ArrayList<Long>();
@@ -209,56 +220,64 @@ public class MoveTemplateService {
 
       MoveTemplate moveTemplate =
           moveTemplateRepo.find(Long.valueOf((Integer) moveTemplateMap.get("id")));
-      Move move =
-          moveService
-              .getMoveCreateService()
-              .createMove(
-                  moveTemplate.getJournal(),
-                  moveTemplate.getJournal().getCompany(),
-                  null,
-                  null,
+
+      if (moveTemplate.getJournal().getCompany() != null) {
+        Move move =
+            moveService
+                .getMoveCreateService()
+                .createMove(
+                    moveTemplate.getJournal(),
+                    moveTemplate.getJournal().getCompany(),
+                    null,
+                    null,
+                    moveDate,
+                    null,
+                    MoveRepository.TECHNICAL_ORIGIN_TEMPLATE);
+        int counter = 1;
+
+        for (MoveTemplateLine moveTemplateLine : moveTemplate.getMoveTemplateLineList()) {
+
+          BigDecimal amount = moveTemplateLine.getDebit().add(moveTemplateLine.getCredit());
+
+          MoveLine moveLine =
+              moveLineService.createMoveLine(
+                  move,
+                  moveTemplateLine.getPartner(),
+                  moveTemplateLine.getAccount(),
+                  amount,
+                  moveTemplateLine.getDebit().compareTo(BigDecimal.ZERO) == 1,
                   moveDate,
-                  null,
-                  MoveRepository.TECHNICAL_ORIGIN_TEMPLATE);
-      int counter = 1;
+                  moveDate,
+                  counter,
+                  moveTemplate.getFullName(),
+                  moveTemplateLine.getName());
+          move.getMoveLineList().add(moveLine);
 
-      for (MoveTemplateLine moveTemplateLine : moveTemplate.getMoveTemplateLineList()) {
+          Tax tax = moveTemplateLine.getTax();
 
-        BigDecimal amount = moveTemplateLine.getDebit().add(moveTemplateLine.getCredit());
-
-        MoveLine moveLine =
-            moveLineService.createMoveLine(
-                move,
-                moveTemplateLine.getPartner(),
-                moveTemplateLine.getAccount(),
-                amount,
-                moveTemplateLine.getDebit().compareTo(BigDecimal.ZERO) == 1,
-                moveDate,
-                moveDate,
-                counter,
-                moveTemplate.getFullName(),
-                moveTemplateLine.getName());
-        move.getMoveLineList().add(moveLine);
-
-        Tax tax = moveTemplateLine.getTax();
-
-        if (tax != null) {
-          TaxLine taxLine = taxService.getTaxLine(tax, moveDate);
-          if (taxLine != null) {
-            moveLine.setTaxLine(taxLine);
-            moveLine.setTaxRate(taxLine.getValue());
-            moveLine.setTaxCode(tax.getCode());
+          if (tax != null) {
+            TaxLine taxLine = taxService.getTaxLine(tax, moveDate);
+            if (taxLine != null) {
+              moveLine.setTaxLine(taxLine);
+              moveLine.setTaxRate(taxLine.getValue());
+              moveLine.setTaxCode(tax.getCode());
+            }
           }
+
+          moveLine.setAnalyticDistributionTemplate(
+              moveTemplateLine.getAnalyticDistributionTemplate());
+          moveLineService.generateAnalyticMoveLines(moveLine);
+
+          counter++;
         }
 
-        moveLine.setAnalyticDistributionTemplate(
-            moveTemplateLine.getAnalyticDistributionTemplate());
-        moveLineService.generateAnalyticMoveLines(moveLine);
+        if (moveTemplate.getAutomaticallyValidate()) {
+          moveValidateService.validate(move);
+        }
 
-        counter++;
+        moveRepo.save(move);
+        moveList.add(move.getId());
       }
-      moveRepo.save(move);
-      moveList.add(move.getId());
     }
     return moveList;
   }
@@ -320,5 +339,32 @@ public class MoveTemplateService {
     } else {
       return false;
     }
+  }
+
+  public Map<String, Object> computeTotals(MoveTemplate moveTemplate) {
+    Map<String, Object> values = new HashMap<>();
+
+    if (moveTemplate.getMoveTemplateLineList() == null
+        || moveTemplate.getMoveTemplateLineList().isEmpty()) {
+      return values;
+    }
+    values.put("$totalLines", moveTemplate.getMoveTemplateLineList().size());
+
+    BigDecimal totalDebit =
+        moveTemplate.getMoveTemplateLineList().stream()
+            .map(MoveTemplateLine::getDebit)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+    values.put("$totalDebit", totalDebit);
+
+    BigDecimal totalCredit =
+        moveTemplate.getMoveTemplateLineList().stream()
+            .map(MoveTemplateLine::getCredit)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+    values.put("$totalCredit", totalCredit);
+
+    BigDecimal difference = totalDebit.subtract(totalCredit);
+    values.put("$difference", difference);
+
+    return values;
   }
 }

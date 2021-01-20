@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -19,22 +19,24 @@ package com.axelor.apps.production.service;
 
 import com.axelor.apps.base.db.Partner;
 import com.axelor.apps.base.db.Product;
+import com.axelor.apps.base.service.app.AppBaseService;
 import com.axelor.apps.production.db.ManufOrder;
 import com.axelor.apps.production.db.OperationOrder;
-import com.axelor.apps.production.db.repo.ProductionOrderRepository;
 import com.axelor.apps.production.service.app.AppProductionService;
 import com.axelor.apps.production.service.manuforder.ManufOrderService;
 import com.axelor.apps.production.service.manuforder.ManufOrderServiceImpl;
 import com.axelor.apps.purchase.db.PurchaseOrder;
 import com.axelor.apps.purchase.db.repo.PurchaseOrderRepository;
 import com.axelor.apps.purchase.service.PurchaseOrderLineService;
+import com.axelor.apps.purchase.service.PurchaseOrderService;
 import com.axelor.apps.stock.service.StockRulesService;
 import com.axelor.apps.supplychain.db.MrpLine;
 import com.axelor.apps.supplychain.db.repo.MrpLineTypeRepository;
 import com.axelor.apps.supplychain.service.MrpLineServiceImpl;
-import com.axelor.apps.supplychain.service.PurchaseOrderServiceSupplychainImpl;
+import com.axelor.apps.supplychain.service.PurchaseOrderSupplychainService;
 import com.axelor.db.Model;
 import com.axelor.exception.AxelorException;
+import com.axelor.inject.Beans;
 import com.google.inject.Inject;
 import com.google.inject.persist.Transactional;
 import java.time.LocalDate;
@@ -47,17 +49,17 @@ public class MrpLineServiceProductionImpl extends MrpLineServiceImpl {
 
   @Inject
   public MrpLineServiceProductionImpl(
-      AppProductionService appProductionService,
-      PurchaseOrderServiceSupplychainImpl purchaseOrderServiceSupplychainImpl,
+      AppBaseService appBaseService,
+      PurchaseOrderSupplychainService purchaseOrderSupplychainService,
+      PurchaseOrderService purchaseOrderService,
       PurchaseOrderLineService purchaseOrderLineService,
       PurchaseOrderRepository purchaseOrderRepo,
-      ManufOrderService manufOrderService,
-      ProductionOrderRepository productionOrderRepo,
-      StockRulesService stockRulesService) {
-
+      StockRulesService stockRulesService,
+      ManufOrderService manufOrderService) {
     super(
-        appProductionService,
-        purchaseOrderServiceSupplychainImpl,
+        appBaseService,
+        purchaseOrderSupplychainService,
+        purchaseOrderService,
         purchaseOrderLineService,
         purchaseOrderRepo,
         stockRulesService);
@@ -66,19 +68,24 @@ public class MrpLineServiceProductionImpl extends MrpLineServiceImpl {
 
   @Override
   public void generateProposal(
-      MrpLine mrpLine, Map<Pair<Partner, LocalDate>, PurchaseOrder> purchaseOrders)
+      MrpLine mrpLine,
+      Map<Pair<Partner, LocalDate>, PurchaseOrder> purchaseOrders,
+      Map<Partner, PurchaseOrder> purchaseOrdersPerSupplier,
+      boolean isProposalsPerSupplier)
       throws AxelorException {
 
-    super.generateProposal(mrpLine, purchaseOrders);
+    super.generateProposal(
+        mrpLine, purchaseOrders, purchaseOrdersPerSupplier, isProposalsPerSupplier);
 
     if (mrpLine.getMrpLineType().getElementSelect()
-        == MrpLineTypeRepository.ELEMENT_MANUFACTURING_PROPOSAL) {
+            == MrpLineTypeRepository.ELEMENT_MANUFACTURING_PROPOSAL
+        && Beans.get(AppProductionService.class).isApp("production")) {
 
       this.generateManufacturingProposal(mrpLine);
     }
   }
 
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   protected void generateManufacturingProposal(MrpLine mrpLine) throws AxelorException {
 
     Product product = mrpLine.getProduct();
@@ -91,6 +98,7 @@ public class MrpLineServiceProductionImpl extends MrpLineServiceImpl {
             ManufOrderService.IS_TO_INVOICE,
             null,
             mrpLine.getMaturityDate().atStartOfDay(),
+            null,
             ManufOrderServiceImpl
                 .ORIGIN_TYPE_MRP); // TODO compute the time to produce to put the manuf order at the
     // correct day
@@ -100,6 +108,11 @@ public class MrpLineServiceProductionImpl extends MrpLineServiceImpl {
 
   @Override
   protected String computeRelatedName(Model model) {
+
+    if (!Beans.get(AppProductionService.class).isApp("production")) {
+
+      return super.computeRelatedName(model);
+    }
 
     if (model instanceof ManufOrder) {
 
@@ -117,6 +130,10 @@ public class MrpLineServiceProductionImpl extends MrpLineServiceImpl {
 
   @Override
   protected Partner getPartner(Model model) {
+
+    if (!Beans.get(AppProductionService.class).isApp("production")) {
+      return super.getPartner(model);
+    }
 
     if (model instanceof ManufOrder) {
 

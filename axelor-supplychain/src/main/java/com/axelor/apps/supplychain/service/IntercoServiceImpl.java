@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -19,6 +19,7 @@ package com.axelor.apps.supplychain.service;
 
 import com.axelor.apps.account.db.Account;
 import com.axelor.apps.account.db.AccountingSituation;
+import com.axelor.apps.account.db.AnalyticMoveLine;
 import com.axelor.apps.account.db.Invoice;
 import com.axelor.apps.account.db.InvoiceLine;
 import com.axelor.apps.account.db.PaymentMode;
@@ -43,7 +44,6 @@ import com.axelor.apps.base.service.PartnerPriceListService;
 import com.axelor.apps.base.service.PartnerService;
 import com.axelor.apps.base.service.TradingNameService;
 import com.axelor.apps.base.service.tax.FiscalPositionService;
-import com.axelor.apps.purchase.db.IPurchaseOrder;
 import com.axelor.apps.purchase.db.PurchaseOrder;
 import com.axelor.apps.purchase.db.PurchaseOrderLine;
 import com.axelor.apps.purchase.db.repo.PurchaseOrderRepository;
@@ -71,8 +71,10 @@ import java.util.Set;
 
 public class IntercoServiceImpl implements IntercoService {
 
+  protected static int DEFAULT_INVOICE_COPY = 1;
+
   @Override
-  @Transactional(rollbackOn = {AxelorException.class, RuntimeException.class})
+  @Transactional(rollbackOn = {Exception.class})
   public SaleOrder generateIntercoSaleFromPurchase(PurchaseOrder purchaseOrder)
       throws AxelorException {
 
@@ -146,7 +148,7 @@ public class IntercoServiceImpl implements IntercoService {
   }
 
   @Override
-  @Transactional(rollbackOn = {AxelorException.class, RuntimeException.class})
+  @Transactional(rollbackOn = {Exception.class})
   public PurchaseOrder generateIntercoPurchaseFromSale(SaleOrder saleOrder) throws AxelorException {
 
     PurchaseOrderService purchaseOrderService = Beans.get(PurchaseOrderService.class);
@@ -158,7 +160,7 @@ public class IntercoServiceImpl implements IntercoService {
     purchaseOrder.setContactPartner(saleOrder.getContactPartner());
     purchaseOrder.setCurrency(saleOrder.getCurrency());
     purchaseOrder.setDeliveryDate(saleOrder.getDeliveryDate());
-    purchaseOrder.setOrderDate(saleOrder.getOrderDate());
+    purchaseOrder.setOrderDate(saleOrder.getCreationDate());
     purchaseOrder.setPriceList(saleOrder.getPriceList());
     purchaseOrder.setTradingName(saleOrder.getTradingName());
     purchaseOrder.setPurchaseOrderLineList(new ArrayList<>());
@@ -166,14 +168,12 @@ public class IntercoServiceImpl implements IntercoService {
     purchaseOrder.setPrintingSettings(
         Beans.get(TradingNameService.class).getDefaultPrintingSettings(null, intercoCompany));
 
-    purchaseOrder.setStatusSelect(IPurchaseOrder.STATUS_DRAFT);
+    purchaseOrder.setStatusSelect(PurchaseOrderRepository.STATUS_DRAFT);
     purchaseOrder.setSupplierPartner(saleOrder.getCompany().getPartner());
     purchaseOrder.setTradingName(saleOrder.getTradingName());
 
     // in ati
     purchaseOrder.setInAti(saleOrder.getInAti());
-    // copy date
-    purchaseOrder.setOrderDate(saleOrder.getOrderDate());
 
     // copy payments
     PaymentMode intercoPaymentMode =
@@ -252,6 +252,11 @@ public class IntercoServiceImpl implements IntercoService {
     // tax
     purchaseOrderLine.setTaxLine(saleOrderLine.getTaxLine());
 
+    // analyticalDistribution
+    purchaseOrderLine =
+        Beans.get(PurchaseOrderLineServiceSupplychainImpl.class)
+            .getAndComputeAnalyticDistribution(purchaseOrderLine, purchaseOrder);
+
     purchaseOrder.addPurchaseOrderLineListItem(purchaseOrderLine);
     return purchaseOrderLine;
   }
@@ -290,6 +295,14 @@ public class IntercoServiceImpl implements IntercoService {
 
     // tax
     saleOrderLine.setTaxLine(purchaseOrderLine.getTaxLine());
+
+    // analyticDistribution
+    saleOrderLine =
+        Beans.get(SaleOrderLineServiceSupplyChainImpl.class)
+            .getAndComputeAnalyticDistribution(saleOrderLine, saleOrder);
+    for (AnalyticMoveLine obj : saleOrderLine.getAnalyticMoveLineList()) {
+      obj.setSaleOrderLine(saleOrderLine);
+    }
 
     saleOrder.addSaleOrderLineListItem(saleOrderLine);
     return saleOrderLine;
@@ -359,9 +372,13 @@ public class IntercoServiceImpl implements IntercoService {
     if (accountingSituation != null) {
       intercoInvoice.setInvoiceAutomaticMail(accountingSituation.getInvoiceAutomaticMail());
       intercoInvoice.setInvoiceMessageTemplate(accountingSituation.getInvoiceMessageTemplate());
+      intercoInvoice.setPfpValidatorUser(accountingSituation.getPfpValidatorUser());
     }
     intercoInvoice.setPriceList(intercoPriceList);
-    intercoInvoice.setInvoicesCopySelect(intercoPartner.getInvoicesCopySelect());
+    intercoInvoice.setInvoicesCopySelect(
+        (intercoPartner.getInvoicesCopySelect() == 0)
+            ? DEFAULT_INVOICE_COPY
+            : intercoPartner.getInvoicesCopySelect());
     intercoInvoice.setCreatedByInterco(true);
     intercoInvoice.setInterco(false);
 

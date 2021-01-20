@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <object-views xmlns="http://axelor.com/xml/ns/object-views" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
-	xsi:schemaLocation="http://axelor.com/xml/ns/object-views http://axelor.com/xml/ns/object-views/object-views_5.0.xsd">
+	xsi:schemaLocation="http://axelor.com/xml/ns/object-views http://axelor.com/xml/ns/object-views/object-views_5.3.xsd">
 
 	<grid name="employment-contract-grid" title="Employment contracts" model="com.axelor.apps.hr.db.EmploymentContract">
         <hilite color="warning" if="$moment(endDate).diff(todayDate) &gt;= 0 &amp;&amp; $moment(todayDate).diff(startDate) &gt;= 0"/>
@@ -22,18 +22,28 @@
 		<field name="status"/>
     </grid>
 
-    <form name="employment-contract-form" title="Employment contract" model="com.axelor.apps.hr.db.EmploymentContract" onNew="action-employment-contract-record-on-new">
-        <toolbar>
-            <button name="createAmendmentBtn" title="Create amendment" onClick="save,action-employment-contract-method-addAmendment" hidden="true"/>
-            <button name="editContractWordMLBtn" title="Print contract" onClick="save,action-employment-contract-validate-printing-settings,action-employment-contract-export-word"/>
-        	<button name="generatePayrollPreparationBtn" title="Generate payroll prepa." onClick="save,action-employment-contract-generate-payroll-prepa"
-					if="__config__.app.getApp('employee').getPayrollPreparation()"/>
-        </toolbar>
+    <form name="employment-contract-form" title="Employment contract" model="com.axelor.apps.hr.db.EmploymentContract" onNew="action-employment-contract-record-on-new" width="large">
+		<menubar>
+			<menu title="Tools" icon="fa-wrench" showTitle="true">
+				<item title="Create amendment" action="save,action-employment-contract-method-addAmendment" hideIf="true"/>
+				<item title="Print contract" action="save,action-employment-contract-validate-printing-settings,action-employment-contract-export-word"/>
+				<item title="Generate payroll prepa." action="save,action-employment-contract-generate-payroll-prepa"
+						if="__config__.app.getApp('employee').getPayrollPreparation()"/>
+				<item title="Export employment contract" action="save,action-employment-contract-method-export"/>
+			</menu>
+		</menubar>
         <panel name="statusPanel" title="Status">
         	<field name="status" colSpan="12" widget="NavSelect" canEdit="true" showTitle="false"/>
         </panel>
         <panel-stack name="generalDetailsPanel">
 			<panel name="employeeDetailsPanel">
+			  <field name="ref" showTitle="false" readonly="true" colSpan="12">
+				<viewer depends="ref"><![CDATA[
+					<h3>
+						{{record.ref}}
+					</h3>
+				]]></viewer>
+			  </field>
 			  <field name="employee" canSuggest="false" canNew="false" canEdit="false" canView="false" hideIf="$popup()" requiredIf="!$popup()"/>
 			  <field name="payCompany" canEdit="false" canSuggest="false" onChange="action-employment-contract-paycompany-onchange"/>
 			  <field name="companyDepartment" onSelect="action-employment-contract-attrs-department-domain"/>
@@ -50,7 +60,8 @@
 			<field name="contractType" canNew="true"
 				   grid-view="employment-contract-type-grid"
 				   form-view="employment-contract-type-form" colSpan="4"
-				   onChange="action-employment-contract-record-contract-type-on-change"/>
+				   onChange="action-employment-contract-record-contract-type-on-change,action-employment-contract-attrs-contract-type-on-change"/>
+			<field name="employmentContractSubType" colSpan="4" showIf="contractType != null" onSelect="action-employment-contract-attrs-employment-contract-sub-type-on-select"/>
 			<field name="executiveStatusSelect" colSpan="4"/>
 			<field name="employment" colSpan="4"/>
 			<panel name="organizationPanel" title="Organization" colSpan="12">
@@ -104,12 +115,16 @@
         <call class="com.axelor.apps.hr.web.EmploymentContractController" method="addAmendment"/>
     </action-method>
     
+    <action-method name="action-employment-contract-method-export">
+    	<call class="com.axelor.apps.hr.web.EmploymentContractController" method="exportEmploymentContract"/>
+    </action-method>
+    
     <action-validate name="action-employment-contract-validate-printing-settings">
     	<error message="Please, select an employment contract template" if="!employmentContractTemplate"/>
     </action-validate>
     
     <action-export output="/home/employment_contracts" download="true" name="action-employment-contract-export-word">
-  		<export template="eval: com.axelor.meta.MetaFiles.getPath(EmploymentContractTemplate.metaFile).toString()" name="${fullName}.xml" engine="groovy"/>
+  		<export template="eval: com.axelor.meta.MetaFiles.getPath(employmentContractTemplate.metaFile).toString()" name="${fullName}.xml" engine="groovy"/>
 	</action-export>
 	
 	<action-view name="action-employment-contract-generate-payroll-prepa" title="Payroll Preparation" model="com.axelor.apps.hr.db.PayrollPreparation">
@@ -117,5 +132,14 @@
 		<view type="grid" name="payroll-preparation-grid"/>
     	<context name="_idEmploymentContract" expr="eval: id"/>
 	</action-view>
+	
+	<action-attrs name="action-employment-contract-attrs-contract-type-on-change">
+		<attribute name="value" for="employmentContractSubType" expr="eval: null" if="contractType == null"/>
+	</action-attrs>
+	
+	<action-attrs name="action-employment-contract-attrs-employment-contract-sub-type-on-select">
+		<attribute name="domain" for="employmentContractSubType" expr="eval: &quot;self.id IN (${contractType.employmentContractSubTypeList.collect{it.id}.join(',')})&quot;" if="!contractType.employmentContractSubTypeList.isEmpty()"/>
+		<attribute name="domain" for="employmentContractSubType" expr="eval: &quot; self.id IN (0) &quot;" if="contractType.employmentContractSubTypeList.isEmpty()"/>
+	</action-attrs>
 
 </object-views>

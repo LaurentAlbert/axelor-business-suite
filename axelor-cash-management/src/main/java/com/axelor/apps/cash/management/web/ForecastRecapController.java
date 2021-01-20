@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -17,21 +17,26 @@
  */
 package com.axelor.apps.cash.management.web;
 
+import com.axelor.apps.base.service.CurrencyService;
+import com.axelor.apps.base.service.app.AppBaseService;
 import com.axelor.apps.cash.management.db.ForecastRecap;
 import com.axelor.apps.cash.management.db.ForecastRecapLine;
 import com.axelor.apps.cash.management.db.repo.ForecastRecapRepository;
 import com.axelor.apps.cash.management.exception.IExceptionMessage;
 import com.axelor.apps.cash.management.service.ForecastRecapService;
+import com.axelor.apps.cash.management.translation.ITranslation;
 import com.axelor.exception.AxelorException;
 import com.axelor.exception.db.repo.TraceBackRepository;
+import com.axelor.exception.service.TraceBackService;
 import com.axelor.i18n.I18n;
 import com.axelor.inject.Beans;
 import com.axelor.meta.schema.actions.ActionView;
 import com.axelor.rpc.ActionRequest;
 import com.axelor.rpc.ActionResponse;
-import com.google.inject.Inject;
+import com.axelor.rpc.Context;
 import java.lang.invoke.MethodHandles;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -45,8 +50,6 @@ public class ForecastRecapController {
 
   private final Logger logger = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-  @Inject private ForecastRecapService forecastRecapService;
-
   public void populate(ActionRequest request, ActionResponse response) throws AxelorException {
     ForecastRecap forecastRecap = request.getContext().asType(ForecastRecap.class);
     if (forecastRecap.getCompany() == null) {
@@ -54,27 +57,44 @@ public class ForecastRecapController {
           TraceBackRepository.CATEGORY_CONFIGURATION_ERROR,
           I18n.get(IExceptionMessage.FORECAST_COMPANY));
     }
-    forecastRecapService.populate(
-        Beans.get(ForecastRecapRepository.class).find(forecastRecap.getId()));
+    Beans.get(ForecastRecapService.class)
+        .populate(Beans.get(ForecastRecapRepository.class).find(forecastRecap.getId()));
     response.setReload(true);
   }
 
-  public void showReport(ActionRequest request, ActionResponse response) throws AxelorException {
-
+  public void fillStartingBalance(ActionRequest request, ActionResponse response) {
     ForecastRecap forecastRecap = request.getContext().asType(ForecastRecap.class);
-
-    String url = forecastRecapService.getURLForecastRecapPDF(forecastRecap);
-
-    String title = I18n.get("ForecastRecap");
-    title += forecastRecap.getId();
-
-    logger.debug("Printing " + title);
-
-    response.setView(ActionView.define(title).add("html", url).map());
+    try {
+      if (forecastRecap.getBankDetails() != null) {
+        BigDecimal amount =
+            Beans.get(CurrencyService.class)
+                .getAmountCurrencyConvertedAtDate(
+                    forecastRecap.getBankDetails().getCurrency(),
+                    forecastRecap.getCompany().getCurrency(),
+                    forecastRecap.getBankDetails().getBalance(),
+                    Beans.get(AppBaseService.class).getTodayDate(forecastRecap.getCompany()))
+                .setScale(AppBaseService.DEFAULT_NB_DECIMAL_DIGITS, RoundingMode.HALF_UP);
+        forecastRecap.setStartingBalance(amount);
+      } else {
+        BigDecimal amount =
+            Beans.get(CurrencyService.class)
+                .getAmountCurrencyConvertedAtDate(
+                    forecastRecap.getCompany().getDefaultBankDetails().getCurrency(),
+                    forecastRecap.getCompany().getCurrency(),
+                    forecastRecap.getCompany().getDefaultBankDetails().getBalance(),
+                    Beans.get(AppBaseService.class).getTodayDate(forecastRecap.getCompany()))
+                .setScale(AppBaseService.DEFAULT_NB_DECIMAL_DIGITS, RoundingMode.HALF_UP);
+        forecastRecap.setStartingBalance(amount);
+      }
+      response.setValues(forecastRecap);
+    } catch (Exception e) {
+      TraceBackService.trace(e);
+    }
   }
 
   public void sales(ActionRequest request, ActionResponse response) throws AxelorException {
     Long id = new Long(request.getContext().get("_id").toString());
+    ForecastRecapService forecastRecapService = Beans.get(ForecastRecapService.class);
     ForecastRecap forecastRecap = Beans.get(ForecastRecapRepository.class).find(id);
     forecastRecap.setForecastRecapLineList(new ArrayList<ForecastRecapLine>());
     Map<LocalDate, BigDecimal> mapExpected = new HashMap<LocalDate, BigDecimal>();
@@ -110,12 +130,6 @@ public class ForecastRecapController {
   public void spending(ActionRequest request, ActionResponse response) throws AxelorException {
     Long id = new Long(request.getContext().get("_id").toString());
     ForecastRecap forecastRecap = Beans.get(ForecastRecapRepository.class).find(id);
-    forecastRecap.setForecastRecapLineList(new ArrayList<ForecastRecapLine>());
-
-    forecastRecapService.populateWithTimetablesOrOrders(forecastRecap);
-    forecastRecapService.populateWithExpenses(forecastRecap);
-    forecastRecapService.populateWithSalaries(forecastRecap);
-    forecastRecapService.populateWithForecastsNoSave(forecastRecap);
     List<Map<String, Object>> dataList = new ArrayList<Map<String, Object>>();
     Map<LocalDate, BigDecimal> map = new HashMap<LocalDate, BigDecimal>();
     for (ForecastRecapLine forecastRecapLine : forecastRecap.getForecastRecapLineList()) {
@@ -142,18 +156,6 @@ public class ForecastRecapController {
   public void marges(ActionRequest request, ActionResponse response) throws AxelorException {
     Long id = new Long(request.getContext().get("_id").toString());
     ForecastRecap forecastRecap = Beans.get(ForecastRecapRepository.class).find(id);
-    forecastRecap.setForecastRecapLineList(new ArrayList<ForecastRecapLine>());
-
-    forecastRecapService.populateWithTimetablesOrOrders(forecastRecap);
-    forecastRecapService.populateWithExpenses(forecastRecap);
-    forecastRecapService.populateWithSalaries(forecastRecap);
-    forecastRecapService.populateWithForecastsNoSave(forecastRecap);
-    forecastRecapService.populateWithInvoices(forecastRecap);
-    if (forecastRecap.getOpportunitiesTypeSelect() != null
-        && forecastRecap.getOpportunitiesTypeSelect()
-            > ForecastRecapRepository.OPPORTUNITY_TYPE_NO) {
-      forecastRecapService.populateWithOpportunities(forecastRecap);
-    }
     List<Map<String, Object>> dataList = new ArrayList<Map<String, Object>>();
     Map<LocalDate, BigDecimal> map = new HashMap<LocalDate, BigDecimal>();
     for (ForecastRecapLine forecastRecapLine : forecastRecap.getForecastRecapLineList()) {
@@ -186,5 +188,18 @@ public class ForecastRecapController {
       dataList.add(dataMap);
     }
     response.setData(dataList);
+  }
+
+  public void print(ActionRequest request, ActionResponse response) throws AxelorException {
+    Context context = request.getContext();
+    Long forecastRecapId = new Long(context.get("_forecastRecapId").toString());
+    String reportType = (String) context.get("reportTypeSelect");
+    String fileLink =
+        Beans.get(ForecastRecapService.class).getForecastRecapFileLink(forecastRecapId, reportType);
+    String title = I18n.get(ITranslation.CASH_MANAGEMENT_REPORT_TITLE);
+    title += forecastRecapId;
+    logger.debug("Printing " + title);
+    response.setView(ActionView.define(title).add("html", fileLink).map());
+    response.setCanClose(true);
   }
 }

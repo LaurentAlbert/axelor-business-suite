@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -25,8 +25,8 @@ import java.math.BigDecimal;
 
 public interface WeightedAveragePriceService {
 
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
-  public void computeAvgPriceForProduct(Product product);
+  @Transactional
+  public void computeAvgPriceForProduct(Product product) throws AxelorException;
 
   public BigDecimal computeAvgPriceForCompany(Product product, Company company);
 }

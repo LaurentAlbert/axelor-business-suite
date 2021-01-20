@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -26,6 +26,8 @@ import com.axelor.apps.stock.report.IReport;
 import com.axelor.apps.tool.ModelTool;
 import com.axelor.apps.tool.ThrowConsumer;
 import com.axelor.apps.tool.file.PdfTool;
+import com.axelor.auth.AuthUtils;
+import com.axelor.auth.db.User;
 import com.axelor.exception.AxelorException;
 import com.axelor.exception.db.repo.TraceBackRepository;
 import com.axelor.i18n.I18n;
@@ -35,6 +37,7 @@ import java.io.IOException;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 public class ConformityCertificatePrintServiceImpl implements ConformityCertificatePrintService {
 
@@ -73,7 +76,12 @@ public class ConformityCertificatePrintServiceImpl implements ConformityCertific
         ReportFactory.createReport(IReport.CONFORMITY_CERTIFICATE, title + " - ${date}");
     return reportSetting
         .addParam("StockMoveId", stockMove.getId())
+        .addParam(
+            "Timezone",
+            stockMove.getCompany() != null ? stockMove.getCompany().getTimezone() : null)
         .addParam("Locale", locale)
+        .addParam("HeaderHeight", stockMove.getPrintingSettings().getPdfHeaderHeight())
+        .addParam("FooterHeight", stockMove.getPrintingSettings().getPdfFooterHeight())
         .addFormat(format);
   }
 
@@ -99,7 +107,10 @@ public class ConformityCertificatePrintServiceImpl implements ConformityCertific
 
     return I18n.get(plural ? "Conformity Certificates" : "Certificate of conformity")
         + " - "
-        + Beans.get(AppBaseService.class).getTodayDate().format(DateTimeFormatter.BASIC_ISO_DATE)
+        + Beans.get(AppBaseService.class)
+            .getTodayDate(
+                Optional.ofNullable(AuthUtils.getUser()).map(User::getActiveCompany).orElse(null))
+            .format(DateTimeFormatter.BASIC_ISO_DATE)
         + "."
         + format;
   }

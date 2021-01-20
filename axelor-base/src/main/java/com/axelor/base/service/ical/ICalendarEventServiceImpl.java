@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -39,9 +39,7 @@ public class ICalendarEventServiceImpl implements ICalendarEventService {
           AxelorException, MessagingException, IOException, ICalendarException, ParseException {
     if (email != null) {
       if (event.getAttendees() == null
-          || !event
-              .getAttendees()
-              .stream()
+          || !event.getAttendees().stream()
               .anyMatch(x -> email.getAddress().equals(x.getEmail()))) {
         ICalendarUser calUser = new ICalendarUser();
         calUser.setEmail(email.getAddress());

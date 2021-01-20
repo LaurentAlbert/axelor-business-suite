@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -19,12 +19,14 @@ package com.axelor.apps.base.web;
 
 import com.axelor.apps.base.db.ImportConfiguration;
 import com.axelor.apps.base.db.ImportHistory;
+import com.axelor.apps.base.db.repo.ImportConfigurationRepository;
+import com.axelor.apps.base.service.app.AppBaseService;
 import com.axelor.apps.base.service.imports.ImportService;
 import com.axelor.exception.service.TraceBackService;
+import com.axelor.inject.Beans;
 import com.axelor.meta.MetaFiles;
 import com.axelor.rpc.ActionRequest;
 import com.axelor.rpc.ActionResponse;
-import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
@@ -33,16 +35,18 @@ import org.apache.commons.io.FileUtils;
 @Singleton
 public class ImportConfigurationController {
 
-  @Inject private ImportService importService;
-
   public void run(ActionRequest request, ActionResponse response) {
 
     ImportConfiguration importConfiguration =
         request.getContext().asType(ImportConfiguration.class);
-
     try {
 
-      ImportHistory importHistory = importService.run(importConfiguration);
+      ImportHistory importHistory = Beans.get(ImportService.class).run(importConfiguration);
+
+      response.setValue("statusSelect", ImportConfigurationRepository.STATUS_COMPLETED);
+      response.setValue(
+          "endDateTime", Beans.get(AppBaseService.class).getTodayDateTime().toLocalDateTime());
+
       response.setAttr("importHistoryList", "value:add", importHistory);
       File readFile = MetaFiles.getPath(importHistory.getLogMetaFile()).toFile();
       response.setNotify(
@@ -50,6 +54,7 @@ public class ImportConfigurationController {
               .replaceAll("(\r\n|\n\r|\r|\n)", "<br />"));
 
     } catch (Exception e) {
+      response.setValue("statusSelect", ImportConfigurationRepository.STATUS_ERROR);
       TraceBackService.trace(response, e);
     }
   }

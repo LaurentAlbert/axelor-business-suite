@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -20,6 +20,7 @@ package com.axelor.apps.base.service.administration;
 import com.axelor.app.AppSettings;
 import com.axelor.apps.base.service.user.UserService;
 import com.axelor.apps.tool.file.CsvTool;
+import com.axelor.apps.tool.xml.XPathParse;
 import com.axelor.auth.db.Group;
 import com.axelor.auth.db.repo.GroupRepository;
 import com.axelor.inject.Beans;
@@ -46,6 +47,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -85,8 +87,6 @@ public class ExportDbObjectService {
 
   @Transactional
   public MetaFile exportObject() {
-
-    //		group = AuthUtils.getUser().getGroup();
     group = Beans.get(GroupRepository.class).all().filter("self.code = 'admins'").fetchOne();
     try {
       log.debug("Attachment dir: {}", AppSettings.get().get("file.upload.dir"));
@@ -114,8 +114,13 @@ public class ExportDbObjectService {
       metaFile = Beans.get(MetaFileRepository.class).save(metaFile);
 
       SAXParserFactory saxParserFactory = SAXParserFactory.newInstance();
-      updateObjectMap(
-          Arrays.asList(moduleDir.listFiles()), saxParserFactory.newSAXParser(), new XmlHandler());
+      saxParserFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+
+      SAXParser parser = saxParserFactory.newSAXParser();
+      parser.setProperty(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+      parser.setProperty(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
+
+      updateObjectMap(Arrays.asList(moduleDir.listFiles()), parser, new XmlHandler());
 
       writeObjects(MetaFiles.getPath(metaFile).toFile());
 
@@ -219,12 +224,14 @@ public class ExportDbObjectService {
 
     String url = AppSettings.get().getBaseURL() + "#/ds";
     String viewType = getActionViewType(action.getXml());
-    if (viewType.equals("grid")) {
-      url = url + "/" + action.getName() + "/list/1";
-    } else if (viewType.equals("form")) {
-      url = url + "/" + action.getName() + "/edit";
-    } else if (viewType.equals("calendar")) {
-      url = url + "/" + action.getName() + "/calendar";
+    if (viewType != null) {
+      if (viewType.equals("grid")) {
+        url = url + "/" + action.getName() + "/list/1";
+      } else if (viewType.equals("form")) {
+        url = url + "/" + action.getName() + "/edit";
+      } else if (viewType.equals("calendar")) {
+        url = url + "/" + action.getName() + "/calendar";
+      }
     }
 
     return url;
@@ -232,26 +239,26 @@ public class ExportDbObjectService {
 
   public static String getActionViewType(String xml) {
 
-    DocumentBuilderFactory domFactory = DocumentBuilderFactory.newInstance();
+    DocumentBuilderFactory domFactory = Beans.get(XPathParse.class).getDocumentBuilderFactory();
     domFactory.setNamespaceAware(true); // never forget this!
     DocumentBuilder builder;
 
     try {
       builder = domFactory.newDocumentBuilder();
       File tempXml = File.createTempFile("Temp", "xml");
-      FileWriter fw = new FileWriter(tempXml);
-      fw.write(xml);
-      fw.close();
-      Document doc = builder.parse(new FileInputStream(tempXml));
-      Node child = doc.getFirstChild();
-      NodeList chs = child.getChildNodes();
-      for (Integer i = 0; i < chs.getLength(); i++) {
-        if (chs.item(i).getNodeName().equals("view")) {
-          NamedNodeMap attributes = chs.item(i).getAttributes();
-          return attributes.getNamedItem("type").getNodeValue();
+      try (FileWriter fw = new FileWriter(tempXml)) {
+        fw.write(xml);
+        Document doc = builder.parse(new FileInputStream(tempXml));
+        Node child = doc.getFirstChild();
+        NodeList chs = child.getChildNodes();
+        for (Integer i = 0; i < chs.getLength(); i++) {
+          if (chs.item(i).getNodeName().equals("view")) {
+            NamedNodeMap attributes = chs.item(i).getAttributes();
+            return attributes.getNamedItem("type").getNodeValue();
+          }
         }
+        return "";
       }
-      return "";
     } catch (Exception e) {
       log.error(e.getMessage());
     }

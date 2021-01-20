@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -25,17 +25,29 @@ import com.axelor.apps.account.service.config.AccountConfigService;
 import com.axelor.apps.account.service.invoice.InvoiceToolService;
 import com.axelor.apps.account.service.invoice.workflow.ventilate.WorkflowVentilationServiceImpl;
 import com.axelor.apps.account.service.payment.invoice.payment.InvoicePaymentCreateService;
+import com.axelor.apps.base.db.Unit;
+import com.axelor.apps.base.service.UnitConversionService;
+import com.axelor.apps.base.service.app.AppBaseService;
 import com.axelor.apps.purchase.db.PurchaseOrder;
 import com.axelor.apps.purchase.db.PurchaseOrderLine;
 import com.axelor.apps.purchase.db.repo.PurchaseOrderRepository;
 import com.axelor.apps.sale.db.SaleOrder;
 import com.axelor.apps.sale.db.SaleOrderLine;
 import com.axelor.apps.sale.db.repo.SaleOrderRepository;
+import com.axelor.apps.stock.db.StockMove;
+import com.axelor.apps.stock.db.StockMoveLine;
+import com.axelor.apps.stock.db.repo.StockMoveLineRepository;
+import com.axelor.apps.supplychain.db.SupplyChainConfig;
+import com.axelor.apps.supplychain.exception.IExceptionMessage;
 import com.axelor.apps.supplychain.service.AccountingSituationSupplychainService;
 import com.axelor.apps.supplychain.service.PurchaseOrderInvoiceService;
 import com.axelor.apps.supplychain.service.SaleOrderInvoiceService;
+import com.axelor.apps.supplychain.service.StockMoveInvoiceService;
 import com.axelor.apps.supplychain.service.app.AppSupplychainService;
+import com.axelor.apps.supplychain.service.config.SupplyChainConfigService;
 import com.axelor.exception.AxelorException;
+import com.axelor.exception.db.repo.TraceBackRepository;
+import com.axelor.i18n.I18n;
 import com.axelor.inject.Beans;
 import com.google.inject.Inject;
 import java.lang.invoke.MethodHandles;
@@ -62,6 +74,16 @@ public class WorkflowVentilationServiceSupplychainImpl extends WorkflowVentilati
 
   private AppSupplychainService appSupplychainService;
 
+  private StockMoveInvoiceService stockMoveInvoiceService;
+
+  private UnitConversionService unitConversionService;
+
+  private AppBaseService appBaseService;
+
+  private SupplyChainConfigService supplyChainConfigService;
+
+  private StockMoveLineRepository stockMoveLineRepository;
+
   @Inject
   public WorkflowVentilationServiceSupplychainImpl(
       AccountConfigService accountConfigService,
@@ -72,7 +94,12 @@ public class WorkflowVentilationServiceSupplychainImpl extends WorkflowVentilati
       SaleOrderRepository saleOrderRepository,
       PurchaseOrderRepository purchaseOrderRepository,
       AccountingSituationSupplychainService accountingSituationSupplychainService,
-      AppSupplychainService appSupplychainService) {
+      AppSupplychainService appSupplychainService,
+      StockMoveInvoiceService stockMoveInvoiceService,
+      UnitConversionService unitConversionService,
+      AppBaseService appBaseService,
+      SupplyChainConfigService supplyChainConfigService,
+      StockMoveLineRepository stockMoveLineRepository) {
 
     super(accountConfigService, invoicePaymentRepo, invoicePaymentCreateService);
     this.saleOrderInvoiceService = saleOrderInvoiceService;
@@ -81,6 +108,11 @@ public class WorkflowVentilationServiceSupplychainImpl extends WorkflowVentilati
     this.purchaseOrderRepository = purchaseOrderRepository;
     this.accountingSituationSupplychainService = accountingSituationSupplychainService;
     this.appSupplychainService = appSupplychainService;
+    this.stockMoveInvoiceService = stockMoveInvoiceService;
+    this.unitConversionService = unitConversionService;
+    this.appBaseService = appBaseService;
+    this.supplyChainConfigService = supplyChainConfigService;
+    this.stockMoveLineRepository = stockMoveLineRepository;
   }
 
   public void afterVentilation(Invoice invoice) throws AxelorException {
@@ -97,6 +129,9 @@ public class WorkflowVentilationServiceSupplychainImpl extends WorkflowVentilati
     }
     if (invoice.getInterco() || invoice.getCreatedByInterco()) {
       updateIntercoReference(invoice);
+    }
+    if (invoice.getStockMoveSet() != null && !invoice.getStockMoveSet().isEmpty()) {
+      stockMoveProcess(invoice);
     }
   }
 
@@ -124,13 +159,7 @@ public class WorkflowVentilationServiceSupplychainImpl extends WorkflowVentilati
 
     for (InvoiceLine invoiceLine : invoice.getInvoiceLineList()) {
       SaleOrder saleOrder = null;
-
-      if (appSupplychainService.getAppSupplychain().getManageInvoicedAmountByLine()) {
-        saleOrder = this.saleOrderLineProcess(invoice, invoiceLine);
-      } else {
-        saleOrder = invoiceLine.getSaleOrder();
-      }
-
+      saleOrder = this.saleOrderLineProcess(invoice, invoiceLine);
       if (saleOrder != null) {
         saleOrderSet.add(saleOrder);
       }
@@ -143,7 +172,9 @@ public class WorkflowVentilationServiceSupplychainImpl extends WorkflowVentilati
       accountingSituationSupplychainService.updateUsedCredit(saleOrder.getClientPartner());
 
       // determine if the invoice is a balance invoice.
-      if (saleOrder.getAmountInvoiced().compareTo(saleOrder.getExTaxTotal()) == 0) {
+      if (saleOrder.getAmountInvoiced().compareTo(saleOrder.getExTaxTotal()) == 0
+          && invoice.getOperationSubTypeSelect()
+              != InvoiceRepository.OPERATION_SUB_TYPE_SUBSCRIPTION) {
         invoice.setOperationSubTypeSelect(InvoiceRepository.OPERATION_SUB_TYPE_BALANCE);
       }
     }
@@ -191,13 +222,7 @@ public class WorkflowVentilationServiceSupplychainImpl extends WorkflowVentilati
 
     for (InvoiceLine invoiceLine : invoice.getInvoiceLineList()) {
       PurchaseOrder purchaseOrder = null;
-
-      if (appSupplychainService.getAppSupplychain().getManageInvoicedAmountByLine()) {
-        purchaseOrder = this.purchaseOrderLineProcess(invoice, invoiceLine);
-      } else {
-        purchaseOrder = invoiceLine.getPurchaseOrder();
-      }
-
+      purchaseOrder = this.purchaseOrderLineProcess(invoice, invoiceLine);
       if (purchaseOrder != null) {
         purchaseOrderSet.add(purchaseOrder);
       }
@@ -247,5 +272,97 @@ public class WorkflowVentilationServiceSupplychainImpl extends WorkflowVentilati
         purchaseOrderLine.getAmountInvoiced().add(invoicedAmountToAdd));
 
     return purchaseOrder;
+  }
+
+  private void stockMoveProcess(Invoice invoice) throws AxelorException {
+    // update qty invoiced in stock move line
+    for (InvoiceLine invoiceLine : invoice.getInvoiceLineList()) {
+      StockMoveLine stockMoveLine = invoiceLine.getStockMoveLine();
+      if (stockMoveLine == null) {
+        continue;
+      }
+      if (isStockMoveInvoicingPartiallyActivated(invoice, stockMoveLine)) {
+        BigDecimal qty = stockMoveLine.getQtyInvoiced();
+        StockMove stockMove = stockMoveLine.getStockMove();
+
+        if (stockMoveInvoiceService.isInvoiceRefundingStockMove(stockMove, invoice)) {
+          qty = qty.subtract(invoiceLine.getQty());
+        } else {
+          qty = qty.add(invoiceLine.getQty());
+        }
+
+        BigDecimal qtyToCompare = qty;
+
+        Unit movUnit = stockMoveLine.getUnit(), invUnit = invoiceLine.getUnit();
+        try {
+          qtyToCompare =
+              unitConversionService.convert(
+                  invUnit, movUnit, qty, appBaseService.getNbDecimalDigitForQty(), null);
+        } catch (AxelorException e) {
+          throw new AxelorException(
+              TraceBackRepository.CATEGORY_INCONSISTENCY,
+              I18n.get(IExceptionMessage.STOCK_MOVE_INVOICE_QTY_INVONVERTIBLE_UNIT)
+                  + "\n"
+                  + e.getMessage());
+        }
+
+        if (stockMoveLine.getRealQty().compareTo(qtyToCompare) >= 0) {
+          stockMoveLine.setQtyInvoiced(qty);
+        } else {
+          throw new AxelorException(
+              TraceBackRepository.CATEGORY_INCONSISTENCY,
+              I18n.get(IExceptionMessage.STOCK_MOVE_INVOICE_QTY_MAX));
+        }
+      } else {
+        // set qty invoiced to the maximum (or emptying it if refund) for all stock move lines
+        boolean invoiceIsRefund =
+            stockMoveInvoiceService.isInvoiceRefundingStockMove(
+                stockMoveLine.getStockMove(), invoice);
+        stockMoveLine.setQtyInvoiced(
+            invoiceIsRefund ? BigDecimal.ZERO : stockMoveLine.getRealQty());
+        // search in sale/purchase order lines to set split stock move lines to invoiced.
+        if (stockMoveLine.getSaleOrderLine() != null) {
+          stockMoveLineRepository
+              .all()
+              .filter(
+                  "self.saleOrderLine.id = :saleOrderLineId AND self.stockMove.id = :stockMoveId")
+              .bind("saleOrderLineId", stockMoveLine.getSaleOrderLine().getId())
+              .bind("stockMoveId", stockMoveLine.getStockMove().getId())
+              .fetch()
+              .forEach(
+                  stockMvLine ->
+                      stockMvLine.setQtyInvoiced(
+                          invoiceIsRefund ? BigDecimal.ZERO : stockMvLine.getRealQty()));
+        }
+        if (stockMoveLine.getPurchaseOrderLine() != null) {
+          stockMoveLineRepository
+              .all()
+              .filter(
+                  "self.purchaseOrderLine.id = :purchaseOrderLineId AND self.stockMove.id = :stockMoveId")
+              .bind("purchaseOrderLineId", stockMoveLine.getPurchaseOrderLine().getId())
+              .bind("stockMoveId", stockMoveLine.getStockMove().getId())
+              .fetch()
+              .forEach(
+                  stockMvLine ->
+                      stockMvLine.setQtyInvoiced(
+                          invoiceIsRefund ? BigDecimal.ZERO : stockMvLine.getRealQty()));
+        }
+      }
+    }
+
+    // update stock moves invoicing status
+    for (StockMove stockMove : invoice.getStockMoveSet()) {
+      stockMoveInvoiceService.computeStockMoveInvoicingStatus(stockMove);
+    }
+  }
+
+  private boolean isStockMoveInvoicingPartiallyActivated(
+      Invoice invoice, StockMoveLine stockMoveLine) throws AxelorException {
+    SupplyChainConfig supplyChainConfig =
+        supplyChainConfigService.getSupplyChainConfig(invoice.getCompany());
+    return stockMoveLine.getSaleOrderLine() != null
+            && supplyChainConfig.getActivateOutStockMovePartialInvoicing()
+        || stockMoveLine.getPurchaseOrderLine() != null
+            && supplyChainConfig.getActivateIncStockMovePartialInvoicing();
   }
 }

@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <object-views xmlns="http://axelor.com/xml/ns/object-views"
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://axelor.com/xml/ns/object-views http://axelor.com/xml/ns/object-views/object-views_5.0.xsd">
+	xsi:schemaLocation="http://axelor.com/xml/ns/object-views http://axelor.com/xml/ns/object-views/object-views_5.3.xsd">
   
      <grid name="bank-statement-grid" title="Bank Statements" model="com.axelor.apps.bankpayment.db.BankStatement"  orderBy="-toDate,name">
 			<toolbar>
 				<button name="showBankStatementLinesBtn" title="See bank statement lines" onClick="account-bank-statement-view-bank-statement-lines" />
 			</toolbar>
+			<field name="id" hidden="false" width="120"/>
 		  	<field name="ebicsPartner.ebicsBank" width="250" if="eval: __config__.app.getApp('bank-payment').enableEbicsModule"/>
 		  	<field name="ebicsPartner" width="150" if="eval: __config__.app.getApp('bank-payment').enableEbicsModule"/>
 		  	<field name="bankStatementFileFormat" />
@@ -44,7 +45,12 @@
             </panel>
             <panel-dashlet name="bankStatementLinesPanel" action="action-bank-statement-view-bank-statement-lines" colSpan="12" height="500" canSearch="true" hideIf="bankStatementFileFormat.statementFileFormatSelect.indexOf(&quot;camt.xxx.cfonb120&quot;) == 0"/>
             <panel-dashlet name="bankStatementLinesAfb120Panel" action="action-bank-statement-view-bank-statement-lines-afb-120" colSpan="12" height="500" canSearch="true" showIf="bankStatementFileFormat.statementFileFormatSelect.indexOf(&quot;camt.xxx.cfonb120&quot;) == 0"/>
-        </panel>
+		    <label name="infoLabel" title="Initial balance" colSpan="12" css="btn-info"/>
+		    <label name="primaryLabel" title="Final balance" colSpan="12" css="btn-primary"/>
+		    <label name="sucessLabel" title="Reconciled bank statement line" colSpan="12" css="btn-success"/>
+		    <label name="warningLabel" title="Partially reconciled bank statement line" colSpan="12" css="btn-warning"/>
+		    <label name="dangerLabel" title="Unreconciled bank statement line" colSpan="12" css="btn-danger"/>        
+		</panel>
 	</form>
 	
 	<action-view name="account-bank-statement-view-bank-statement-lines"
@@ -65,8 +71,8 @@
 		<context name="_id" expr="eval: id"/>
  	</action-view>
     
-    <action-view name="action-bank-statement-view-bank-statement-lines-afb-120" title="Bank statement lines" model="com.axelor.apps.bankpayment.db.BankStatementLineAFB120">
- 		<view type="grid" name="bank-statement-line-afb-120-grid"/>
+	<action-view name="action-bank-statement-view-bank-statement-lines-afb-120" title="Bank statement lines" model="com.axelor.apps.bankpayment.db.BankStatementLineAFB120">
+ 		<view type="grid" name="bank-statement-line-afb-120-grid-dashlet"/>
  		<view type="form" name="bank-statement-line-afb-120-form"/>
 		<view-param name="limit" value="200"/>
  		<domain>self.bankStatement.id = :_id</domain>
@@ -81,4 +87,9 @@
     	<call class="com.axelor.apps.bankpayment.web.BankStatementController" method="runBankReconciliation"/>	
     </action-method>
 
+	<search-filters name="bank-statement-filters" model="com.axelor.apps.bankpayment.db.BankStatement" title="Bank Statement filters">
+        <field name="ebicsPartner.ebicsBank" hidden="true" if="eval: !__config__.app.getApp('bank-payment').enableEbicsModule"/>
+		<field name="ebicsPartner" hidden="true" if="eval: !__config__.app.getApp('bank-payment').enableEbicsModule"/>
+    </search-filters>
+    
 </object-views>

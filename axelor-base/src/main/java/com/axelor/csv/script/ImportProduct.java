@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -21,6 +21,7 @@ import com.axelor.apps.base.db.Product;
 import com.axelor.apps.base.db.repo.ProductRepository;
 import com.axelor.apps.base.service.ProductService;
 import com.axelor.common.StringUtils;
+import com.axelor.exception.AxelorException;
 import com.axelor.meta.MetaFiles;
 import com.axelor.meta.db.MetaFile;
 import com.google.inject.Inject;
@@ -57,7 +58,9 @@ public class ImportProduct {
           final MetaFile metaFile = metaFiles.upload(image);
           product.setPicture(metaFile);
         } else {
-          LOG.debug("No image file found: {}", image.getAbsolutePath());
+          LOG.debug(
+              "No image file found: {}",
+              image == null ? path.toAbsolutePath() : image.getAbsolutePath());
         }
 
       } catch (Exception e) {
@@ -68,7 +71,7 @@ public class ImportProduct {
     return productRepo.save(product);
   }
 
-  public Object generateVariant(Object bean, Map<String, Object> values) {
+  public Object generateVariant(Object bean, Map<String, Object> values) throws AxelorException {
 
     assert bean instanceof Product;
 

@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -22,6 +22,7 @@ import com.axelor.apps.base.db.Partner;
 import com.axelor.apps.stock.db.PartnerStockSettings;
 import com.axelor.apps.stock.db.StockLocation;
 import com.axelor.exception.AxelorException;
+import com.axelor.meta.CallMethod;
 
 public interface PartnerStockSettingsService {
 
@@ -48,5 +49,17 @@ public interface PartnerStockSettingsService {
    * @param partner
    * @param company
    */
+  @CallMethod
   public StockLocation getDefaultStockLocation(Partner partner, Company company);
+
+  /**
+   * Search for partner stock settings and returns default external default location for given
+   * partner and company
+   *
+   * @param partner
+   * @param company
+   * @return null if the config is empty, else the found stock location.
+   */
+  @CallMethod
+  StockLocation getDefaultExternalStockLocation(Partner partner, Company company);
 }

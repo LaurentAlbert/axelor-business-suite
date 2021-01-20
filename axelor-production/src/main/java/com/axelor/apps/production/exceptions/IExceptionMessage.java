@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -39,13 +39,19 @@ public interface IExceptionMessage {
   static final String CANNOT_DELETE_REALIZED_STOCK_MOVE_LINES = /*$$(*/
       "You cannot delete realized stock move lines." /*)*/;
 
+  static final String CHECK_BOM_AND_PROD_PROCESS = /*$$(*/
+      "The production process and the bill of material must be applicable" /*)*/;
+
   /** Batch Compute work in progress valuation */
   static final String BATCH_COMPUTE_VALUATION = /*$$(*/ "Computed work in progress valuation" /*)*/;
 
   static final String IN_OR_OUT_INVALID_ARG = /*$$(*/ "inOrOut is invalid" /*)*/;
 
-  /** Bill of Material Service */
+  /** Bill of Materials Service */
   static final String BOM_1 = /*$$(*/ "Personalized" /*)*/;
+
+  static final String BOM_MISSING_UNIT_ON_PRODUCT = /*$$(*/
+      "Please fill unit for product %s." /*)*/;
 
   /** Production Order Wizard and controller */
   static final String PRODUCTION_ORDER_1 = /*$$(*/ "Production's order created" /*)*/;
@@ -54,6 +60,7 @@ public interface IExceptionMessage {
       "Error during production's order's creation" /*)*/;
   static final String PRODUCTION_ORDER_3 = /*$$(*/ "You must add a positive quantity" /*)*/;
   static final String PRODUCTION_ORDER_4 = /*$$(*/ "You must select a nomenclature" /*)*/;
+  static final String PRODUCTION_ORDER_5 = /*$$(*/ "Invalid date" /*)*/;
 
   /** Production Config Service */
   static final String PRODUCTION_CONFIG_1 = /*$$(*/
@@ -87,35 +94,44 @@ public interface IExceptionMessage {
 
   /** ProdProcess service */
   static final String PROD_PROCESS_USELESS_PRODUCT = /*$$(*/
-      "The product %s is not in the bill of material related to this production process" /*)*/;
+      "The product %s is not in the bill of materials related to this production process" /*)*/;
 
   static final String PROD_PROCESS_MISS_PRODUCT = /*$$(*/
       "Not enough quantity in products to consume for: %s" /*)*/;
 
   static final String CHARGE_MACHINE_DAYS = /*$$(*/ "Too many days" /*)*/;
 
-  /** Bill of material service */
+  /** Bill of materials service */
   static final String COST_TYPE_CANNOT_BE_CHANGED = /*$$(*/
       "The product cost cannot be changed because the product cost type is not manual" /*)*/;
 
   static final String MAX_DEPTH_REACHED = /*$$(*/ "Max depth reached when copying BOM." /*)*/;
 
   /** Configurator Controller */
-  String BILL_OF_MATERIAL_GENERATED = /*$$(*/ "The bill of material %s has been generated" /*)*/;
+  String BILL_OF_MATERIAL_GENERATED = /*$$(*/ "The bill of materials %s has been generated" /*)*/;
 
   /** Configurator Bom Service */
   String CONFIGURATOR_BOM_TOO_MANY_CALLS = /*$$(*/
-      "Too many recursive calls to create the bill of material." /*)*/;
+      "Too many recursive calls to create the bill of materials." /*)*/;
 
   String CONFIGURATOR_BOM_IMPORT_TOO_MANY_CALLS = /*$$(*/
       "Too many recursive calls to import the bill of material configurator." /*)*/;
+
+  String CONFIGURATOR_BOM_IMPORT_GENERATED_PRODUCT_NULL = /*$$(*/
+      "Error while generating bill of material: the product of the bill of material is supposed to be generated from the configurator but the configurator did not generate a product." /*)*/;
+
+  String CONFIGURATOR_BOM_IMPORT_FORMULA_PRODUCT_NULL = /*$$(*/
+      "Error while generating bill of material: the product of the bill of material is supposed to be computed from a script but the script did not return a product." /*)*/;
+
+  String CONFIGURATOR_BOM_IMPORT_FILLED_PRODUCT_NULL = /*$$(*/
+      "Error while generating bill of material: the product of the bill of material is supposed to be filled in the configurator BOM but it was empty." /*)*/;
 
   /** Stock move line production controller */
   String STOCK_MOVE_LINE_UNKNOWN_PARENT_CONTEXT = /*$$(*/ "Unknown parent context class." /*)*/;
 
   /** Production Order Controller */
   static final String MANUF_ORDER_NO_GENERATION = /*$$(*/
-      "Cannot add a manufacturing order without a production process. Please check that your chosen bill of material has a valid production process." /*)*/;
+      "Cannot add a manufacturing order without a production process. Please check that your chosen bill of materials has a valid production process." /*)*/;
 
   static final String MANUF_ORDER_MISSING_TEMPLATE = /*$$(*/
       "The template to send message for manufacturing order is missing." /*)*/;
@@ -136,4 +152,24 @@ public interface IExceptionMessage {
 
   static final String MANUF_ORDER_EMAIL_NOT_SENT = /*$$(*/
       "Automatic email was not sent because no default email account and/or no valid email account was found : please create one." /*)*/;
+
+  static final String MANUF_STOCK_MOVE_ERROR_1 = /*$$(*/ "All products has been consumed" /*)*/;
+
+  static final String UNIT_COST_CALCULATION_IMPORT_FAIL_ERROR = /*$$(*/ "Data import failed" /*)*/;
+
+  static final String UNIT_COST_CALCULATION_IMPORT_CSV_ERROR = /*$$(*/
+      "Uploaded file is not a CSV file" /*)*/;
+
+  static final String UNIT_COST_CALCULATION_NO_PRODUCT = /*$$(*/
+      "Please select an element (a product, a product category or a product family) to run calculation" /*)*/;
+
+  // CostSheetLine service
+  static final String MISSING_PRODUCT_PURCHASE_CURRENCY = /*$$(*/
+      "Purchase currency is missing for product %s, please configure it." /*)*/;
+
+  //  Mrp service
+  String MRP_BOM_LEVEL_TOO_HIGH = /*$$(*/
+      "Configuration issue: the MRP execution was canceled because a loop was detected when searching for components in BOM." /*)*/;
+  String MRP_BOM_LEVEL_TOO_HIGH_PRODUCT = /*$$(*/
+      "Configuration issue in product %s: the MRP execution was canceled because a loop was detected when searching for components in BOM." /*)*/;
 }

@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -23,6 +23,8 @@ import com.axelor.apps.base.service.app.AppBaseService;
 import com.axelor.apps.sale.db.SaleOrder;
 import com.axelor.apps.sale.db.repo.SaleOrderRepository;
 import com.axelor.apps.supplychain.service.SaleOrderInvoiceService;
+import com.axelor.auth.AuthUtils;
+import com.axelor.auth.db.User;
 import com.axelor.db.Query;
 import com.axelor.exception.AxelorException;
 import com.google.inject.Inject;
@@ -32,6 +34,7 @@ import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 public class SubscriptionInvoiceServiceImpl implements SubscriptionInvoiceService {
 
@@ -67,7 +70,12 @@ public class SubscriptionInvoiceServiceImpl implements SubscriptionInvoiceServic
                     + "AND (self.contractEndDate IS NULL OR self.contractEndDate >= :subScriptionDate)")
             .bind("saleOrderType", SaleOrderRepository.SALE_ORDER_TYPE_SUBSCRIPTION)
             .bind("saleOrderStatus", SaleOrderRepository.STATUS_ORDER_CONFIRMED)
-            .bind("subScriptionDate", appBaseService.getTodayDate());
+            .bind(
+                "subScriptionDate",
+                appBaseService.getTodayDate(
+                    Optional.ofNullable(AuthUtils.getUser())
+                        .map(User::getActiveCompany)
+                        .orElse(null)));
 
     if (limit != null) {
       return query.fetch(limit);
@@ -77,7 +85,7 @@ public class SubscriptionInvoiceServiceImpl implements SubscriptionInvoiceServic
   }
 
   @Override
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public Invoice generateSubscriptionInvoice(SaleOrder saleOrder) throws AxelorException {
 
     TemporalUnit temporalUnit = ChronoUnit.MONTHS;
@@ -86,12 +94,10 @@ public class SubscriptionInvoiceServiceImpl implements SubscriptionInvoiceServic
         saleOrderInvoiceService.generateInvoice(saleOrderRepo.find(saleOrder.getId()));
 
     if (invoice != null) {
-
-      invoice = saleOrderInvoiceService.generateInvoice(saleOrder);
       if (saleOrder.getPeriodicityTypeSelect() == 1) {
         temporalUnit = ChronoUnit.DAYS;
       }
-      invoice.setInvoiceDate(appBaseService.getTodayDate());
+      invoice.setInvoiceDate(appBaseService.getTodayDate(saleOrder.getCompany()));
       invoice.setOperationSubTypeSelect(InvoiceRepository.OPERATION_SUB_TYPE_SUBSCRIPTION);
 
       LocalDate invoicingPeriodStartDate = saleOrder.getNextInvoicingStartPeriodDate();

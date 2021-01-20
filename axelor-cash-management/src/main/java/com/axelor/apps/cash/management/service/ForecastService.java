@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -17,6 +17,7 @@
  */
 package com.axelor.apps.cash.management.service;
 
+import com.axelor.apps.account.db.repo.PaymentModeRepository;
 import com.axelor.apps.base.db.BankDetails;
 import com.axelor.apps.base.db.Company;
 import com.axelor.apps.base.service.app.AppBaseService;
@@ -51,11 +52,12 @@ public class ForecastService {
               forecastGenerator.getCompany(),
               forecastGenerator.getBankDetails(),
               forecastGenerator.getTypeSelect(),
-              forecastGenerator.getAmount(),
+              forecastGenerator.getTypeSelect() == PaymentModeRepository.IN
+                  ? forecastGenerator.getAmount().abs()
+                  : forecastGenerator.getAmount().negate(),
               itDate,
               forecastGenerator.getForecastReason(),
-              forecastGenerator.getComments(),
-              forecastGenerator.getRealizedSelect());
+              forecastGenerator.getComments());
       forecastRepo.save(forecast);
       itDate = fromDate.plusMonths(++count * forecastGenerator.getPeriodicitySelect());
     }
@@ -69,19 +71,16 @@ public class ForecastService {
       BigDecimal amount,
       LocalDate estimatedDate,
       ForecastReason reason,
-      String comments,
-      int realizedSelect) {
+      String comments) {
 
     Forecast forecast = new Forecast();
     forecast.setForecastGenerator(forecastGenerator);
     forecast.setCompany(company);
     forecast.setBankDetails(bankDetails);
-    forecast.setTypeSelect(typeSelect);
     forecast.setAmount(amount);
     forecast.setEstimatedDate(estimatedDate);
     forecast.setForecastReason(reason);
     forecast.setComments(comments);
-    forecast.setRealizedSelect(realizedSelect);
 
     return forecast;
   }
@@ -90,12 +89,7 @@ public class ForecastService {
   public void reset(ForecastGenerator forecastGenerator) {
     forecastRepo
         .all()
-        .filter(
-            "self.forecastGenerator = ? AND (self.realizedSelect = ? OR (self.realizedSelect = ? AND self.estimatedDate > ?))",
-            forecastGenerator,
-            ForecastRepository.REALISED_SELECT_NO,
-            ForecastRepository.REALISED_SELECT_AUTO,
-            appBaseService.getTodayDate())
+        .filter("self.forecastGenerator = ? AND self.realizationDate IS NULL", forecastGenerator)
         .remove();
   }
 }

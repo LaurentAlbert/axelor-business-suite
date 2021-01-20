@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -27,10 +27,12 @@ import com.axelor.i18n.I18n;
 
 public class StockConfigProductionService extends StockConfigService {
 
-  public StockLocation getProductionVirtualStockLocation(StockConfig stockConfig)
-      throws AxelorException {
+  public StockLocation getProductionVirtualStockLocation(
+      StockConfig stockConfig, boolean isOutsource) throws AxelorException {
 
-    if (stockConfig.getProductionVirtualStockLocation() == null) {
+    if (stockConfig.getProductionVirtualStockLocation() == null
+        || (isOutsource
+            && !stockConfig.getProductionVirtualStockLocation().getIsOutsourcingLocation())) {
       throw new AxelorException(
           stockConfig,
           TraceBackRepository.CATEGORY_CONFIGURATION_ERROR,

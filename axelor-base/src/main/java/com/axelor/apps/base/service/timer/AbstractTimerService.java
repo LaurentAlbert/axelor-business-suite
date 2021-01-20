@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -93,21 +93,22 @@ public abstract class AbstractTimerService implements TimerService {
     timer.setStatusSelect(TimerRepository.TIMER_STOPPED);
   }
 
-  @Transactional
+  @Transactional(rollbackOn = {Exception.class})
   protected Timer tryStartOrCreate(Timer timer) throws AxelorException {
     if (timer == null) {
       timer = new Timer();
       timer.setAssignedToUser(userService.getUser());
     } else if (timer.getStatusSelect().equals(TimerRepository.TIMER_STARTED)) {
       throw new AxelorException(
-          TraceBackRepository.TYPE_FUNCTIONNAL, I18n.get(IExceptionMessage.TIMER_IS_NOT_STOPPED));
+          TraceBackRepository.CATEGORY_INCONSISTENCY,
+          I18n.get(IExceptionMessage.TIMER_IS_NOT_STOPPED));
     }
     timer.setStatusSelect(TimerRepository.TIMER_STARTED);
     return timerRepository.save(timer);
   }
 
   @Override
-  @Transactional(rollbackOn = {Exception.class, RuntimeException.class})
+  @Transactional(rollbackOn = {Exception.class})
   public TimerHistory stop(Model model, Timer timer, LocalDateTime dateTime)
       throws AxelorException {
     Preconditions.checkNotNull(timer, I18n.get(IExceptionMessage.TIMER_IS_NOT_STARTED));
@@ -115,7 +116,8 @@ public abstract class AbstractTimerService implements TimerService {
     TimerHistory last = timerHistoryRepository.findByTimer(timer).order("-startDateT").fetchOne();
     if (last == null) {
       throw new AxelorException(
-          TraceBackRepository.TYPE_FUNCTIONNAL, I18n.get(IExceptionMessage.TIMER_IS_NOT_STARTED));
+          TraceBackRepository.CATEGORY_INCONSISTENCY,
+          I18n.get(IExceptionMessage.TIMER_IS_NOT_STARTED));
     }
     last.setEndDateT(dateTime);
     timer.setStatusSelect(TimerRepository.TIMER_STOPPED);

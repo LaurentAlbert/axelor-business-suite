@@ -1,23 +1,89 @@
 <?xml version="1.0" encoding="utf-8"?>
 <bpm>
-<% __ids__.each({ app = com.axelor.inject.Beans.get('com.axelor.studio.db.repo.AppBuilderRepository' as Class).find(it)
+<%	allApps = com.axelor.inject.Beans.get('com.axelor.studio.db.repo.AppBuilderRepository' as Class).all()
+
+	allModels = com.axelor.inject.Beans.get('com.axelor.meta.db.repo.MetaJsonModelRepository' as Class).all()
+
+	allFields = com.axelor.inject.Beans.get('com.axelor.meta.db.repo.MetaJsonFieldRepository' as Class).all()
 	
-	depends = ""
-	app.dependsOnSet?.each( { depend ->
-		depends +="${depend.code},"
+	allSelections = com.axelor.inject.Beans.get('com.axelor.meta.db.repo.MetaSelectRepository' as Class).all()
+	
+	allCharts = com.axelor.inject.Beans.get('com.axelor.studio.db.repo.ChartBuilderRepository' as Class).all()
+	
+	allDashboards = com.axelor.inject.Beans.get('com.axelor.studio.db.repo.DashboardBuilderRepository' as Class).all()
+	
+	allDashlets = com.axelor.inject.Beans.get('com.axelor.studio.db.repo.DashletBuilderRepository' as Class).all()
+	
+	allActions = com.axelor.inject.Beans.get('com.axelor.studio.db.repo.ActionBuilderRepository' as Class).all()
+	
+	allStudioMetaActions = com.axelor.inject.Beans.get('com.axelor.meta.db.repo.MetaActionRepository' as Class).all()
+
+	allMenus = com.axelor.inject.Beans.get('com.axelor.studio.db.repo.MenuBuilderRepository' as Class).all()
+	
+	allMenusParentMenu = com.axelor.inject.Beans.get('com.axelor.studio.db.repo.MenuBuilderRepository' as Class).all()
+	
+	allWkfs = com.axelor.inject.Beans.get('com.axelor.studio.db.repo.WkfRepository' as Class).all()
+	
+	if(__ids__ != null) {
+		allApps = allApps.filter('self.id in ?1',__ids__)
+		
+		allModels = allModels.filter('self.appBuilder.id in ?1',__ids__)
+		
+		allFields = allFields.filter('self.appBuilder.id in ?1 OR (self.appBuilder is null and self.jsonModel.appBuilder.id in ?1)',__ids__)
+		
+		allSelections = allSelections.filter('(self.appBuilder.id in ?1 OR self.appBuilder is null) AND self.isCustom = true',__ids__)
+					
+		allCharts = allCharts.filter('self.appBuilder.id in ?1',__ids__)
+				
+		allDashboards = allDashboards.filter('self.appBuilder.id in ?1',__ids__)
+		
+		allDashlets = allDashlets.filter('self.appBuilder.id in ?1 or (self.appBuilder is null and self.dashboardBuilder.appBuilder.id in ?1)',__ids__)
+		
+		allActions = allActions.filter('self.appBuilder.id in ?1)',__ids__)
+		
+		allMenus = allMenus.filter('self.appBuilder.id in ?1 and self.parentMenu is null)',__ids__).order('-parentMenu')
+		
+		allMenusParentMenu = allMenusParentMenu.filter('self.appBuilder.id in ?1 and self.parentMenu is not null',__ids__)
+		
+		allStudioMetaActions = allStudioMetaActions.filter('(self.appBuilder.id in ?1 OR self.appBuilder is null) AND self.isCustom = true',__ids__)
+
+		allWkfs = allWkfs.filter('self.appBuilder.id in ?1)',__ids__)
+	} else {
+		allSelections = allSelections.filter('self.isCustom = true')
+	
+		allMenus = allMenus.filter('self.parentMenu is null')
+		
+		allMenusParentMenu = allMenusParentMenu.filter('self.parentMenu is not null')
+
+		allStudioMetaActions = allStudioMetaActions.filter('self.isCustom = true')
+
+	}
+	
+	apps = ""
+	allApps.fetch().each({ 
+		depends = ""
+		it.dependsOnSet?.each({ depend -> depends +="\n\t\t\t<depend code=\"${depend.code}\"/> " })
+		
+		apps += """\n\t<appBuilder>
+		<name>${it.name}</name>
+		<code>${it.code}</code>
+		<description>${it.description}</description>
+		<depends>$depends</depends>
+		<image name=\"${it.image?.fileName}\">${com.axelor.studio.service.ExportService.getImage(it.image)}</image>
+		<sequence>${it.sequence}</sequence>
+		\n\t</appBuilder>"""
 	})
 	
 	models = ""
-	com.axelor.inject.Beans.get('com.axelor.meta.db.repo.MetaJsonModelRepository' as Class)
-		.all()
-		.filter('self.appBuilder.id = ?1',app.id)
-		.fetch()
-		.each({ 
+	allModels.fetch().each({ 
 		model -> models += """\n\t\t<model>
 				\n\t\t\t<name>${model.name}</name>
 				\n\t\t\t<title>${model.title}</title>
                 \n\t\t\t<onNew>${model.onNew}</onNew>
 				\n\t\t\t<onSave>${model.onSave}</onSave>
+				\n\t\t\t<formWidth>${model.formWidth}</formWidth>
+				\n\t\t\t<isGenerateMenu>${model.isGenerateMenu}</isGenerateMenu>
+				\n\t\t\t<menuBuilder name='${model.menuBuilder?.name}' title='${model.menuBuilder?.title}'/>
                 \n\t\t\t<menuTitle>${model.menuTitle}</menuTitle>
                 \n\t\t\t<menuIcon>${model.menuIcon}</menuIcon>
                 \n\t\t\t<menuBackground>${model.menuBackground}</menuBackground>
@@ -29,12 +95,17 @@
 	})
 	
 	fields = ""
-	com.axelor.inject.Beans.get('com.axelor.meta.db.repo.MetaJsonFieldRepository' as Class)
-		.all()
-		.filter('self.appBuilder.id = ?1 OR (self.appBuilder is null and self.jsonModel.appBuilder.id = ?1)',app.id)
-		.fetch()
-		.each({
-		field -> fields += """\n\t\t<field>
+	allFields.fetch().each({
+		field -> 
+				widgetAttrs = ""
+				if (field.widgetAttrs != null) {
+                	widgetAttrs += field.widgetAttrs
+                }
+                valueExpr = ""
+				if (field.valueExpr != null) {
+                	valueExpr += field.valueExpr
+                }
+				fields += """\n\t\t<field>
 				\n\t\t\t<name>${field.name}</name>
 				\n\t\t\t<title>${field.title}</title>
 				\n\t\t\t<type>${field.type}</type>
@@ -59,14 +130,17 @@
 				\n\t\t\t<regex>${field.regex}</regex>
 				\n\t\t\t<required>${field.required}</required>
 				\n\t\t\t<requiredIf>${field.requiredIf}</requiredIf>
+				\n\t\t\t<readonly>${field.readonly}</readonly>
+				\n\t\t\t<readonlyIf>${field.readonlyIf}</readonlyIf>
+				\n\t\t\t<includeIf>${field.includeIf}</includeIf>
 				\n\t\t\t<scale>${field.scale}</scale>
 				\n\t\t\t<selection>${field.selection}</selection>
 				\n\t\t\t<sequence>${field.sequence}</sequence>
 				\n\t\t\t<showIf>${field.showIf}</showIf>
 				\n\t\t\t<targetModel>${field.targetModel}</targetModel>
 				\n\t\t\t<widget>${field.widget}</widget>
-				\n\t\t\t<widgetAttrs>""" + field.widgetAttrs + """</widgetAttrs>
-				\n\t\t\t<valueExpr>${field.valueExpr != null ? """ + field.valueExpr + """ : ""}</valueExpr>
+				\n\t\t\t<widgetAttrs>""" + widgetAttrs + """</widgetAttrs>
+				\n\t\t\t<valueExpr>""" + valueExpr + """</valueExpr>
 				\n\t\t\t<jsonModel>${field.jsonModel?.name}</jsonModel>
 				\n\t\t\t<targetJsonModel>${field.targetJsonModel?.name}</targetJsonModel>
 				\n\t\t\t<appBuilder>${field.appBuilder?.code}</appBuilder>
@@ -75,11 +149,7 @@
 	})
 	
 	selections = ""
-	com.axelor.inject.Beans.get('com.axelor.meta.db.repo.MetaSelectRepository' as Class)
-		.all()
-		.filter('(self.appBuilder.id = ?1 OR self.appBuilder is null) AND self.isCustom = ?2',app.id, true)
-		.fetch()
-		.each({
+	allSelections.fetch().each({
 		selection -> 
 				options = ""
 				selection.items.each{
@@ -106,11 +176,7 @@
 	})
 	
 	charts = ""
-	com.axelor.inject.Beans.get('com.axelor.studio.db.repo.ChartBuilderRepository' as Class)
-		.all()
-		.filter('self.appBuilder.id = ?1',app.id)
-		.fetch()
-		.each({
+	allCharts.fetch().each({
 		chart -> 
 				filters = ""
 				chart.filterList.each{
@@ -158,11 +224,7 @@
 	})
 	
 	dashboards = ""
-	com.axelor.inject.Beans.get('com.axelor.studio.db.repo.DashboardBuilderRepository' as Class)
-		.all()
-		.filter('self.appBuilder.id = ?1',app.id)
-		.fetch()
-		.each({
+	allDashboards.fetch().each({
 		dashboard -> 
 				dashboards += """\n\t\t<dashboardBuilder>
 				\n\t\t\t<name>${dashboard.name}</name>
@@ -171,14 +233,10 @@
 				\n\t\t\t<appBuilder>${dashboard.appBuilder?.code}</appBuilder>
 				\n\t\t</dashboardBuilder>""" 
 				
-	})	
+	})
 	
 	dashlets = ""
-	com.axelor.inject.Beans.get('com.axelor.studio.db.repo.DashletBuilderRepository' as Class)
-		.all()
-		.filter('self.appBuilder.id = ?1 or (self.appBuilder is null and self.dashboardBuilder.appBuilder.id = ?1)',app.id)
-		.fetch()
-		.each({
+	allDashlets.fetch().each({
 		dashlet -> 
 				dashlets += """\n\t\t<dashletBuilder>
 				\n\t\t\t<name>${dashlet.name}</name>
@@ -196,11 +254,7 @@
 	})
 	
 	actions = ""
-	com.axelor.inject.Beans.get('com.axelor.studio.db.repo.ActionBuilderRepository' as Class)
-		.all()
-		.filter('self.appBuilder.id = ?1)',app.id)
-		.fetch()
-		.each({
+	allActions.fetch().each({
 		action ->	
 				lines = com.axelor.studio.service.ExportService.exportActionBuilderLines(action.lines, 4)
 				
@@ -214,7 +268,37 @@
 					\n\t\t\t\t\t<sequence>${view.sequence}</sequence>
 					\n\t\t\t\t</view>"""
 				}
+				emailTemplate = ""
+				if(action.emailTemplate != null){
 				
+				templateContextList = ""
+				action.emailTemplate?.templateContextList.each{
+					templateContextLine -> templateContextList += """\n\t\t\t\t\t<templateContextLine>
+					\n\t\t\t\t\t\t<name>${templateContextLine.name}</name>
+					\n\t\t\t\t\t\t<value>${templateContextLine.value}</value>
+					\n\t\t\t\t\t</templateContextLine>"""
+
+				}
+
+				emailTemplate =  """\n\t\t\t\t<name>${action.emailTemplate?.name}</name>
+					\n\t\t\t\t<mediaTypeSelect>${action.emailTemplate?.mediaTypeSelect}</mediaTypeSelect>
+					\n\t\t\t\t<language>${action.emailTemplate?.language?.code}</language>
+					\n\t\t\t\t<metaModel>${action.emailTemplate?.metaModel?.name}</metaModel>
+					\n\t\t\t\t<replyToRecipients>${action.emailTemplate?.replyToRecipients}</replyToRecipients>
+					\n\t\t\t\t<toRecipients>${action.emailTemplate?.toRecipients}</toRecipients>
+					\n\t\t\t\t<ccRecipients>${action.emailTemplate?.ccRecipients}</ccRecipients>
+					\n\t\t\t\t<bccRecipients>${action.emailTemplate?.bccRecipients}</bccRecipients>
+					\n\t\t\t\t<subject>${action.emailTemplate?.subject}</subject>
+					\n\t\t\t\t<content>${action.emailTemplate?.content}</content>
+					\n\t\t\t\t<templateContextList>$templateContextList
+					\n\t\t\t\t</templateContextList>
+					\n\t\t\t\t<target>${action.emailTemplate?.target}</target>
+					\n\t\t\t\t<isDefault>${action.emailTemplate?.isDefault}</isDefault>
+					\n\t\t\t\t<isSystem>${action.emailTemplate?.isSystem}</isSystem>
+					\n\t\t\t\t<isJson>${action.emailTemplate?.isJson}</isJson>
+					\n\t\t\t\t<metaJsonModel>${action.emailTemplate?.metaJsonModel?.name}</metaJsonModel>
+					\n\t\t\t\t<birtTemplate>${action.emailTemplate?.birtTemplate?.name}</birtTemplate>"""
+				}
 				actions += """\n\t\t<actionBuilder>
 				\n\t\t\t<name>${action.name}</name>
 				\n\t\t\t<typeSelect>${action.typeSelect}</typeSelect>
@@ -223,6 +307,8 @@
 				\n\t\t\t<lines>$lines
 				\n\t\t\t</lines>
 				\n\t\t\t<title>${action.title}</title>
+				\n\t\t\t<emailTemplate>$emailTemplate
+				\n\t\t\t</emailTemplate>
 				\n\t\t\t<transactional>${action.transactional}</transactional>
 				\n\t\t\t<scriptType>${action.scriptType}</scriptType>
 				\n\t\t\t<scriptText>${action.scriptText}</scriptText>
@@ -237,14 +323,27 @@
 				\n\t\t</actionBuilder>""" 
 				
 	})
+	
+	studioMetaActions = ""
+	allStudioMetaActions.fetch().each({
+		studioMetaAction ->
+					studioMetaActions += """\n\t\t<studioMetaAction>
+					\n\t\t\t<name>${studioMetaAction.name}</name>
+					\n\t\t\t<priority>${studioMetaAction.priority}</priority>
+					\n\t\t\t<sequence>${studioMetaAction.sequence}</sequence>
+					\n\t\t\t<type>${studioMetaAction.type}</type>
+					\n\t\t\t<xml>${studioMetaAction.xml}</xml>
+					\n\t\t\t<model>${studioMetaAction.model}</model>
+					\n\t\t\t<module>${studioMetaAction.module}</module>
+					\n\t\t\t<home>${studioMetaAction.home}</home>
+					\n\t\t\t<isCustom>${studioMetaAction.isCustom}</isCustom>
+					\n\t\t\t<appBuilder>${studioMetaAction.appBuilder?.code}</appBuilder>
+					\n\t\t</studioMetaAction>"""
+
+	})
 
 	menus = ""
-	com.axelor.inject.Beans.get('com.axelor.studio.db.repo.MenuBuilderRepository' as Class)
-		.all()
-		.filter('self.appBuilder.id = ?1 and self.parentMenu is null)',app.id)
-		.order('-parentMenu')
-		.fetch()
-		.each({
+	allMenus.fetch().each({
 		menu ->	
 				groups = ""
 				menu.groups.each{
@@ -285,11 +384,7 @@
 				
 	})
 	
-	com.axelor.inject.Beans.get('com.axelor.studio.db.repo.MenuBuilderRepository' as Class)
-		.all()
-		.filter('self.appBuilder.id = ?1 and self.parentMenu is not null',app.id)
-		.fetch()
-		.each({
+	allMenusParentMenu.fetch().each({
 		menu ->	
 				groups = ""
 				menu.groups.each{
@@ -333,11 +428,7 @@
 	wkfs = ""
 	nodes = ""	
 	transitions = ""
-	com.axelor.inject.Beans.get('com.axelor.studio.db.repo.WkfRepository' as Class)
-		.all()
-		.filter('self.appBuilder.id = ?1)',app.id)
-		.fetch()
-		.each({
+	allWkfs.fetch().each({
 		wkf ->	
 				wkf.nodes.each{
 					node ->
@@ -363,7 +454,7 @@
 					}
 					
 					nodes += """\n\t\t\t<node>
-						\n\t\t\t<wkf>${node.wkf.name}</wkf>
+						\n\t\t\t<wkf>${node.wkf.code}</wkf>
 						\n\t\t\t<name>${node.name}</name>
 						\n\t\t\t<title>${node.title}</title>
 						\n\t\t\t<xmlId>${node.xmlId}</xmlId>
@@ -410,7 +501,7 @@
 					
 					
 					transitions += """\n\t\t\t<transition>
-						\n\t\t\t<wkf>${transition.wkf.name}</wkf>
+						\n\t\t\t<wkf>${transition.wkf.code}</wkf>
 						\n\t\t\t<name>${transition.name}</name>
 						\n\t\t\t<xmlId>${transition.xmlId}</xmlId>
 						\n\t\t\t<isButton>${transition.isButton}</isButton>
@@ -428,6 +519,7 @@
 				}
 				
 				wkfs += """\n\t\t<wkf>
+				\n\t\t\t<code>${wkf.code}</code>
 				\n\t\t\t<name>${wkf.name}</name>
 				\n\t\t\t<model>${wkf.model}</model>
 				\n\t\t\t<jsonField>${wkf.jsonField}</jsonField>
@@ -441,22 +533,14 @@
 				
 	})
 	
-	
 	out << 
 	"""
-	<appBuilder>
-		<name>${app.name}</name>
-		<code>${app.code}</code>
-		<description>${app.description}</description>
-		<depends>$depends</depends>
-		<image name=\"${app.image?.fileName}\">${com.axelor.studio.service.ExportService.getImage(app.image)}</image>
-		<sequence>${app.sequence}</sequence>
-	</appBuilder>
-	
+		$apps
+		
 	<models>
 		$models
 	</models>
-	
+		
 	<fields>
 		$fields
 	</fields>
@@ -473,6 +557,10 @@
 		$actions
 	</actionBuilders>
 	
+	<studioMetaActions>
+		$studioMetaActions
+	</studioMetaActions>
+
 	<dashboardBuilders>
 		$dashboards
 	</dashboardBuilders>
@@ -498,6 +586,5 @@
 	</transitions>
 	
 	"""
-}) %>
-
+%>
 </bpm>

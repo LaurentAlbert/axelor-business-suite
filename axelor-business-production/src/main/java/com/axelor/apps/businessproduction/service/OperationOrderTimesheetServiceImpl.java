@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -47,8 +47,7 @@ public class OperationOrderTimesheetServiceImpl implements OperationOrderTimeshe
 
     operationOrderTsLineList.removeAll(oldTimesheetLineList);
     operationOrderTsLineList.addAll(
-        newTimesheetLineList
-            .stream()
+        newTimesheetLineList.stream()
             .filter(timesheetLine -> operationOrder.equals(timesheetLine.getOperationOrder()))
             .collect(Collectors.toList()));
     long durationLong =
@@ -58,7 +57,7 @@ public class OperationOrderTimesheetServiceImpl implements OperationOrderTimeshe
   }
 
   @Override
-  @Transactional
+  @Transactional(rollbackOn = {Exception.class})
   public void updateOperationOrders(Timesheet timesheet) throws AxelorException {
     if (timesheet.getTimesheetLineList() == null) {
       return;
@@ -89,8 +88,7 @@ public class OperationOrderTimesheetServiceImpl implements OperationOrderTimeshe
     allTimesheetLineList.addAll(newTimesheetLineList);
 
     List<OperationOrder> operationOrdersToUpdate =
-        allTimesheetLineList
-            .stream()
+        allTimesheetLineList.stream()
             .map(TimesheetLine::getOperationOrder)
             .filter(Objects::nonNull)
             .distinct()
@@ -107,8 +105,7 @@ public class OperationOrderTimesheetServiceImpl implements OperationOrderTimeshe
       return;
     }
     List<OperationOrder> operationOrderList =
-        timesheetLineList
-            .stream()
+        timesheetLineList.stream()
             .map(TimesheetLine::getOperationOrder)
             .filter(Objects::nonNull)
             .distinct()

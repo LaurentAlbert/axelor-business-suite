@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -34,16 +34,11 @@ import com.axelor.meta.schema.actions.ActionView;
 import com.axelor.rpc.ActionRequest;
 import com.axelor.rpc.ActionResponse;
 import com.google.common.collect.Lists;
-import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import java.util.List;
 
 @Singleton
 public class ProdProcessController {
-
-  @Inject protected ProdProcessService prodProcessService;
-
-  @Inject ProdProcessRepository prodProcessRepo;
 
   public void validateProdProcess(ActionRequest request, ActionResponse response) {
     ProdProcess prodProcess = request.getContext().asType(ProdProcess.class);
@@ -66,7 +61,7 @@ public class ProdProcessController {
       }
       if (bom != null) {
         try {
-          prodProcessService.validateProdProcess(prodProcess, bom);
+          Beans.get(ProdProcessService.class).validateProdProcess(prodProcess, bom);
         } catch (AxelorException e) {
           TraceBackService.trace(response, e, ResponseMessageType.ERROR);
         }
@@ -78,9 +73,16 @@ public class ProdProcessController {
       throws AxelorException {
     ProdProcess prodProcess = request.getContext().asType(ProdProcess.class);
     if (prodProcess.getProdProcessLineList() != null) {
-      prodProcessService.changeProdProcessListOutsourcing(prodProcess);
+      Beans.get(ProdProcessService.class).changeProdProcessListOutsourcing(prodProcess);
     }
     response.setValue("prodProcessLineList", prodProcess.getProdProcessLineList());
+    response.setHidden("prodProcessLineList.outsourcing", !prodProcess.getOutsourcing());
+
+    if (!prodProcess.getOutsourcing()) {
+      response.setValue("generatePurchaseOrderOnMoPlanning", false);
+      response.setValue("subcontractors", null);
+      response.setValue("outsourcingStockLocation", null);
+    }
   }
 
   public void print(ActionRequest request, ActionResponse response) throws AxelorException {
@@ -92,6 +94,9 @@ public class ProdProcessController {
     String fileLink =
         ReportFactory.createReport(IReport.PROD_PROCESS, prodProcessLabel + "-${date}")
             .addParam("Locale", ReportSettings.getPrintingLocale(null))
+            .addParam(
+                "Timezone",
+                prodProcess.getCompany() != null ? prodProcess.getCompany().getTimezone() : null)
             .addParam("ProdProcessId", prodProcessId)
             .generate()
             .getFileLink();
@@ -101,12 +106,13 @@ public class ProdProcessController {
 
   public void checkOriginalProductionProcess(ActionRequest request, ActionResponse response) {
 
+    ProdProcessRepository prodProcessRepository = Beans.get(ProdProcessRepository.class);
     ProdProcess prodProcess =
-        prodProcessRepo.find(request.getContext().asType(ProdProcess.class).getId());
+        prodProcessRepository.find(request.getContext().asType(ProdProcess.class).getId());
 
     List<ProdProcess> prodProcessSet = Lists.newArrayList();
     prodProcessSet =
-        prodProcessRepo
+        prodProcessRepository
             .all()
             .filter("self.originalProdProcess = :origin")
             .bind("origin", prodProcess)
@@ -134,15 +140,17 @@ public class ProdProcessController {
   public void generateNewVersion(ActionRequest request, ActionResponse response) {
 
     ProdProcess prodProcess =
-        prodProcessRepo.find(request.getContext().asType(ProdProcess.class).getId());
+        Beans.get(ProdProcessRepository.class)
+            .find(request.getContext().asType(ProdProcess.class).getId());
 
-    ProdProcess copy = prodProcessService.generateNewVersion(prodProcess);
+    ProdProcess copy = Beans.get(ProdProcessService.class).generateNewVersion(prodProcess);
 
     response.setView(
         ActionView.define("Production process")
             .model(ProdProcess.class.getName())
             .add("form", "prod-process-form")
             .add("grid", "prod-process-grid")
+            .param("search-filters", "prod-process-filters")
             .context("_showRecord", String.valueOf(copy.getId()))
             .map());
   }

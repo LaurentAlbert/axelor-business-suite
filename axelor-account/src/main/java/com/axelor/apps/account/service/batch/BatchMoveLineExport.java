@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -25,7 +25,7 @@ import com.axelor.apps.account.service.MoveLineExportService;
 import com.axelor.apps.base.db.Company;
 import com.axelor.db.JPA;
 import com.axelor.exception.AxelorException;
-import com.axelor.exception.db.IException;
+import com.axelor.exception.db.repo.ExceptionOriginRepository;
 import com.axelor.exception.db.repo.TraceBackRepository;
 import com.axelor.exception.service.TraceBackService;
 import com.axelor.i18n.I18n;
@@ -40,7 +40,7 @@ public class BatchMoveLineExport extends BatchStrategy {
 
   private final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-  protected boolean stop = false;
+  protected boolean end = false;
 
   protected long moveLineDone = 0;
   protected long moveDone = 0;
@@ -61,7 +61,7 @@ public class BatchMoveLineExport extends BatchStrategy {
   }
 
   @Override
-  protected void start() throws IllegalArgumentException, IllegalAccessException, AxelorException {
+  protected void start() throws IllegalAccessException {
 
     super.start();
 
@@ -73,10 +73,10 @@ public class BatchMoveLineExport extends BatchStrategy {
 
       TraceBackService.trace(
           new AxelorException(e, e.getCategory(), ""),
-          IException.MOVE_LINE_EXPORT_ORIGIN,
+          ExceptionOriginRepository.MOVE_LINE_EXPORT_ORIGIN,
           batch.getId());
       incrementAnomaly();
-      stop = true;
+      end = true;
     }
 
     checkPoint();
@@ -85,7 +85,7 @@ public class BatchMoveLineExport extends BatchStrategy {
   @Override
   protected void process() {
 
-    if (!stop) {
+    if (!end) {
       try {
         Company company = batch.getAccountingBatch().getCompany();
         LocalDate startDate = batch.getAccountingBatch().getStartDate();
@@ -114,7 +114,7 @@ public class BatchMoveLineExport extends BatchStrategy {
 
         TraceBackService.trace(
             new AxelorException(e, e.getCategory(), String.format("%s", e)),
-            IException.MOVE_LINE_EXPORT_ORIGIN,
+            ExceptionOriginRepository.MOVE_LINE_EXPORT_ORIGIN,
             batch.getId());
         incrementAnomaly();
 
@@ -122,7 +122,7 @@ public class BatchMoveLineExport extends BatchStrategy {
 
         TraceBackService.trace(
             new Exception(String.format("%s", e), e),
-            IException.MOVE_LINE_EXPORT_ORIGIN,
+            ExceptionOriginRepository.MOVE_LINE_EXPORT_ORIGIN,
             batch.getId());
 
         incrementAnomaly();

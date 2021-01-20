@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -37,6 +37,7 @@ import com.axelor.rpc.JsonContext;
 import com.google.inject.Inject;
 import com.google.inject.persist.Transactional;
 import java.math.BigDecimal;
+import java.util.Optional;
 
 public class ConfiguratorBomServiceImpl implements ConfiguratorBomService {
 
@@ -48,7 +49,7 @@ public class ConfiguratorBomServiceImpl implements ConfiguratorBomService {
   protected ConfiguratorProdProcessService confProdProcessService;
 
   @Inject
-  ConfiguratorBomServiceImpl(
+  public ConfiguratorBomServiceImpl(
       ConfiguratorBOMRepository configuratorBOMRepo,
       ConfiguratorService configuratorService,
       BillOfMaterialRepository billOfMaterialRepository,
@@ -60,8 +61,8 @@ public class ConfiguratorBomServiceImpl implements ConfiguratorBomService {
   }
 
   @Override
-  @Transactional(rollbackOn = {Exception.class, AxelorException.class})
-  public BillOfMaterial generateBillOfMaterial(
+  @Transactional(rollbackOn = {Exception.class})
+  public Optional<BillOfMaterial> generateBillOfMaterial(
       ConfiguratorBOM configuratorBOM, JsonContext attributes, int level, Product generatedProduct)
       throws AxelorException {
     level++;
@@ -76,6 +77,10 @@ public class ConfiguratorBomServiceImpl implements ConfiguratorBomService {
     Unit unit;
     ProdProcess prodProcess;
 
+    if (!checkConditions(configuratorBOM, attributes)) {
+      return Optional.empty();
+    }
+
     if (configuratorBOM.getDefNameAsFormula()) {
       name =
           (String) configuratorService.computeFormula(configuratorBOM.getNameFormula(), attributes);
@@ -83,15 +88,28 @@ public class ConfiguratorBomServiceImpl implements ConfiguratorBomService {
       name = configuratorBOM.getName();
     }
     if (configuratorBOM.getDefProductFromConfigurator()) {
+      if (generatedProduct == null) {
+        throw new AxelorException(
+            TraceBackRepository.CATEGORY_CONFIGURATION_ERROR,
+            I18n.get(IExceptionMessage.CONFIGURATOR_BOM_IMPORT_GENERATED_PRODUCT_NULL));
+      }
       product = generatedProduct;
     } else if (configuratorBOM.getDefProductAsFormula()) {
       product =
           (Product)
               configuratorService.computeFormula(configuratorBOM.getProductFormula(), attributes);
-      if (product != null) {
-        product = Beans.get(ProductRepository.class).find(product.getId());
+      if (product == null) {
+        throw new AxelorException(
+            TraceBackRepository.CATEGORY_CONFIGURATION_ERROR,
+            I18n.get(IExceptionMessage.CONFIGURATOR_BOM_IMPORT_FORMULA_PRODUCT_NULL));
       }
+      product = Beans.get(ProductRepository.class).find(product.getId());
     } else {
+      if (configuratorBOM.getProduct() == null) {
+        throw new AxelorException(
+            TraceBackRepository.CATEGORY_CONFIGURATION_ERROR,
+            I18n.get(IExceptionMessage.CONFIGURATOR_BOM_IMPORT_FILLED_PRODUCT_NULL));
+      }
       product = configuratorBOM.getProduct();
     }
     if (configuratorBOM.getDefQtyAsFormula()) {
@@ -136,18 +154,28 @@ public class ConfiguratorBomServiceImpl implements ConfiguratorBomService {
     billOfMaterial.setUnit(unit);
     billOfMaterial.setProdProcess(prodProcess);
     billOfMaterial.setStatusSelect(configuratorBOM.getStatusSelect());
+    billOfMaterial.setDefineSubBillOfMaterial(configuratorBOM.getDefineSubBillOfMaterial());
 
     if (configuratorBOM.getConfiguratorBomList() != null) {
       for (ConfiguratorBOM confBomChild : configuratorBOM.getConfiguratorBomList()) {
-        BillOfMaterial childBom =
-            generateBillOfMaterial(confBomChild, attributes, level, generatedProduct);
-        billOfMaterial.addBillOfMaterialSetItem(childBom);
+        generateBillOfMaterial(confBomChild, attributes, level, generatedProduct)
+            .ifPresent(billOfMaterial::addBillOfMaterialSetItem);
       }
     }
 
     billOfMaterial = billOfMaterialRepository.save(billOfMaterial);
     configuratorBOM.setBillOfMaterialId(billOfMaterial.getId());
     configuratorBOMRepo.save(configuratorBOM);
-    return billOfMaterial;
+    return Optional.of(billOfMaterial);
+  }
+
+  protected boolean checkConditions(ConfiguratorBOM configuratorBOM, JsonContext jsonAttributes)
+      throws AxelorException {
+    String condition = configuratorBOM.getUseCondition();
+    // no condition = we always generate the bill of materials
+    if (condition == null) {
+      return true;
+    }
+    return (boolean) configuratorService.computeFormula(condition, jsonAttributes);
   }
 }

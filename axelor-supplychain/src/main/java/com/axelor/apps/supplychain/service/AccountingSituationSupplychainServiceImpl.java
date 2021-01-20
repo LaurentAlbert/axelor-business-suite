@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -32,6 +32,7 @@ import com.axelor.apps.sale.db.SaleOrder;
 import com.axelor.apps.sale.db.repo.SaleOrderRepository;
 import com.axelor.apps.sale.exception.BlockedSaleOrderException;
 import com.axelor.apps.sale.service.config.SaleConfigService;
+import com.axelor.apps.supplychain.exception.IExceptionMessage;
 import com.axelor.exception.AxelorException;
 import com.axelor.i18n.I18n;
 import com.axelor.inject.Beans;
@@ -67,7 +68,9 @@ public class AccountingSituationSupplychainServiceImpl extends AccountingSituati
 
     AccountingSituation accountingSituation = super.createAccountingSituation(partner, company);
 
-    if (appAccountService.getAppAccount().getManageCustomerCredit()) {
+    AppAccountService appAccountService = Beans.get(AppAccountService.class);
+    if (appAccountService.getAppAccount().getManageCustomerCredit()
+        && appAccountService.isApp("supplychain")) {
       SaleConfig config = saleConfigService.getSaleConfig(accountingSituation.getCompany());
       if (config != null) {
         accountingSituation.setAcceptedCredit(config.getAcceptedCredit());
@@ -78,7 +81,7 @@ public class AccountingSituationSupplychainServiceImpl extends AccountingSituati
   }
 
   @Override
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public void updateUsedCredit(Partner partner) throws AxelorException {
     if (appAccountService.getAppAccount().getManageCustomerCredit()) {
       List<AccountingSituation> accountingSituationList =
@@ -90,8 +93,12 @@ public class AccountingSituationSupplychainServiceImpl extends AccountingSituati
   }
 
   @Override
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public void updateCustomerCredit(Partner partner) throws AxelorException {
+    if (!Beans.get(AppAccountService.class).isApp("supplychain")) {
+      super.updateCustomerCredit(partner);
+      return;
+    }
     if (!appAccountService.getAppAccount().getManageCustomerCredit()
         || partner.getIsContact()
         || !partner.getIsCustomer()) {
@@ -107,9 +114,8 @@ public class AccountingSituationSupplychainServiceImpl extends AccountingSituati
 
   @Override
   @Transactional(
-    rollbackOn = {AxelorException.class, Exception.class},
-    ignore = {BlockedSaleOrderException.class}
-  )
+      rollbackOn = {AxelorException.class, Exception.class},
+      ignore = {BlockedSaleOrderException.class})
   public void updateCustomerCreditFromSaleOrder(SaleOrder saleOrder) throws AxelorException {
 
     if (!appAccountService.getAppAccount().getManageCustomerCredit()) {
@@ -140,7 +146,11 @@ public class AccountingSituationSupplychainServiceImpl extends AccountingSituati
           if (!saleOrder.getManualUnblock()) {
             String message = accountingSituation.getCompany().getOrderBloquedMessage();
             if (Strings.isNullOrEmpty(message)) {
-              message = I18n.get("Client blocked : maximal accepted credit exceeded.");
+              message =
+                  String.format(
+                      I18n.get(IExceptionMessage.SALE_ORDER_CLIENT_PARTNER_EXCEEDED_CREDIT),
+                      partner.getFullName(),
+                      saleOrder.getSaleOrderSeq());
             }
             throw new BlockedSaleOrderException(accountingSituation, message);
           }

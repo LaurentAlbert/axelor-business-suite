@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -36,7 +36,6 @@ import com.google.inject.persist.Transactional;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -51,21 +50,25 @@ public class LunchVoucherMgtServiceImpl implements LunchVoucherMgtService {
 
   protected HRConfigService hrConfigService;
 
+  protected AppBaseService appBaseService;
+
   @Inject
   public LunchVoucherMgtServiceImpl(
       LunchVoucherMgtLineService lunchVoucherMgtLineService,
       LunchVoucherAdvanceService lunchVoucherAdvanceService,
       LunchVoucherMgtRepository lunchVoucherMgtRepository,
-      HRConfigService hrConfigService) {
+      HRConfigService hrConfigService,
+      AppBaseService appBaseService) {
 
     this.lunchVoucherMgtLineService = lunchVoucherMgtLineService;
     this.lunchVoucherMgtRepository = lunchVoucherMgtRepository;
     this.lunchVoucherAdvanceService = lunchVoucherAdvanceService;
     this.hrConfigService = hrConfigService;
+    this.appBaseService = appBaseService;
   }
 
   @Override
-  @Transactional
+  @Transactional(rollbackOn = {Exception.class})
   public void calculate(LunchVoucherMgt lunchVoucherMgt) throws AxelorException {
     Company company = lunchVoucherMgt.getCompany();
 
@@ -170,7 +173,7 @@ public class LunchVoucherMgtServiceImpl implements LunchVoucherMgtService {
    * @return the stock quantity status of the lunch voucher mgt
    * @throws AxelorException
    */
-  @Transactional
+  @Transactional(rollbackOn = {Exception.class})
   @Override
   public int updateStock(
       List<LunchVoucherMgtLine> newLunchVoucherMgtLines,
@@ -192,13 +195,15 @@ public class LunchVoucherMgtServiceImpl implements LunchVoucherMgtService {
     return hrConfig.getAvailableStockLunchVoucher();
   }
 
-  @Transactional
+  @Transactional(rollbackOn = {Exception.class})
   public void export(LunchVoucherMgt lunchVoucherMgt) throws IOException {
     MetaFile metaFile = new MetaFile();
     metaFile.setFileName(
         I18n.get("LunchVoucherCommand")
             + " - "
-            + LocalDate.now().format(DateTimeFormatter.ISO_DATE)
+            + appBaseService
+                .getTodayDate(lunchVoucherMgt.getCompany())
+                .format(DateTimeFormatter.ISO_DATE)
             + ".csv");
 
     Path tempFile = MetaFiles.createTempFile(null, ".csv");
@@ -238,7 +243,7 @@ public class LunchVoucherMgtServiceImpl implements LunchVoucherMgtService {
      */
     // lunchVoucherMgt.setExported(true);
     lunchVoucherMgt.setCsvFile(metaFile);
-    lunchVoucherMgt.setExportDate(Beans.get(AppBaseService.class).getTodayDate());
+    lunchVoucherMgt.setExportDate(appBaseService.getTodayDate(lunchVoucherMgt.getCompany()));
 
     lunchVoucherMgtRepository.save(lunchVoucherMgt);
   }
@@ -250,7 +255,7 @@ public class LunchVoucherMgtServiceImpl implements LunchVoucherMgtService {
   }
 
   @Override
-  @Transactional
+  @Transactional(rollbackOn = {Exception.class})
   public void validate(LunchVoucherMgt lunchVoucherMgt) throws AxelorException {
     Company company = lunchVoucherMgt.getCompany();
     HRConfig hrConfig = hrConfigService.getHRConfig(company);

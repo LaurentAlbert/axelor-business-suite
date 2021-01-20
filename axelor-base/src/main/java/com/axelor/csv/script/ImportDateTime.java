@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -17,12 +17,18 @@
  */
 package com.axelor.csv.script;
 
+import com.axelor.apps.base.service.app.AppBaseService;
+import com.axelor.auth.AuthUtils;
+import com.axelor.auth.db.User;
+import com.axelor.inject.Beans;
+import com.axelor.meta.CallMethod;
 import com.google.common.base.Strings;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -115,6 +121,7 @@ public class ImportDateTime {
     return datetime;
   }
 
+  @CallMethod
   public String importDate(String inputDate) {
 
     String patDate =
@@ -131,7 +138,15 @@ public class ImportDateTime {
     try {
       if (!Strings.isNullOrEmpty(inputDate) && inputDate.matches(patDate)) {
         List<String> dates = Arrays.asList(inputDate.split("\\["));
-        inputDate = dates.get(0).equals("TODAY") ? LocalDate.now().toString() : dates.get(0);
+        inputDate =
+            dates.get(0).equals("TODAY")
+                ? Beans.get(AppBaseService.class)
+                    .getTodayDate(
+                        Optional.ofNullable(AuthUtils.getUser())
+                            .map(User::getActiveCompany)
+                            .orElse(null))
+                    .toString()
+                : dates.get(0);
         if (dates.size() > 1) {
           LocalDateTime localDate =
               LocalDate.parse(inputDate, DateTimeFormatter.ISO_DATE).atStartOfDay();
@@ -145,7 +160,6 @@ public class ImportDateTime {
         } else return inputDate;
       } else return null;
     } catch (Exception e) {
-      e.printStackTrace();
       return null;
     }
   }
@@ -197,7 +211,6 @@ public class ImportDateTime {
       }
       return null;
     } catch (Exception e) {
-      e.printStackTrace();
       return null;
     }
   }

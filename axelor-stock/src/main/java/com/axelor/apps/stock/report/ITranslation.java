@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -19,7 +19,10 @@ package com.axelor.apps.stock.report;
 
 public interface ITranslation {
 
-  public static final String STOCK_LOCATION_TITLE = /*$$(*/ "StockLocation.title"; /*)*/
+  public static final String STOCK_LOCATION_FINACIALDATA = /*$$(*/
+      "StockLocation.locationFinancialData"; /*)*/
+  public static final String STOCK_STOCK_LOCATION_CONTENT = /*$$(*/
+      "StockLocation.stockLocationContent"; /*)*/
   public static final String STOCK_LOCATION_DATE = /*$$(*/ "StockLocation.date"; /*)*/
   public static final String STOCK_LOCATION_LOCATIONS = /*$$(*/ "StockLocation.locations"; /*)*/
   public static final String STOCK_LOCATION_LOCATION = /*$$(*/ "StockLocation.location"; /*)*/
@@ -45,7 +48,6 @@ public interface ITranslation {
       "StockLocation.detailsByStockLocation"; /*)*/
 
   public static final String INVENTORY_TITLE = /*$$(*/ "Inventory.title"; /*)*/
-  public static final String INVENTORY_NAME = /*$$(*/ "Inventory.name"; /*)*/
   public static final String INVENTORY_BARCODE = /*$$(*/ "Inventory.barcode"; /*)*/
   public static final String INVENTORY_DATE = /*$$(*/ "Inventory.date"; /*)*/
   public static final String INVENTORY_STOCK_LOCATION = /*$$(*/ "Inventory.stockLocation"; /*)*/
@@ -56,6 +58,10 @@ public interface ITranslation {
   public static final String INVENTORY_RACK = /*$$(*/ "Inventory.rack"; /*)*/
   public static final String INVENTORY_TRACKING_NUMBER = /*$$(*/ "Inventory.trackingNumber"; /*)*/
   public static final String INVENTORY_COMPANY = /*$$(*/ "Inventory.company"; /*)*/
+  public static final String INVENTORY_PLANNED_START_DATE = /*$$(*/
+      "Inventory.plannedStartDateT"; /*)*/
+  public static final String INVENTORY_PLANNED_END_DATE = /*$$(*/ "Inventory.plannedEndDateT"; /*)*/
+  public static final String INVENTORY_CREATED_ON_DATE = /*$$(*/ "Inventory.createdOn"; /*)*/
   public static final String INVENTORY_PRODUCT_CATEGORY = /*$$(*/ "Inventory.productCategory"; /*)*/
   public static final String INVENTORY_LAST_INVENTORY_DATE = /*$$(*/
       "Inventory.lastInventoryDate"; /*)*/
@@ -95,6 +101,8 @@ public interface ITranslation {
   public static final String STOCK_MOVE_SUPPLIER_PARTNER_SEQ = /*$$(*/
       "StockMove.supplierPartnerSeq"; /*)*/
   public static final String STOCK_MOVE_NET_MASS = /*$$(*/ "StockMove.netMass"; /*)*/
+  public static final String STOCK_MOVE_LINE_UNIT_PRICE = /*$$(*/ "StockMove.unitPrice"; /*)*/
+  public static final String STOCK_MOVE_ORDER_DATE = /*$$(*/ "StockMove.orderDate"; /*)*/
 
   // PickingStockMove
   public static final String STOCK_MOVE_PICKING_ORDER = /*$$(*/ "StockMove.pickingOrder"; /*)*/

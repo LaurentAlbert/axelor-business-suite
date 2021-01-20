@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -23,6 +23,7 @@ import com.axelor.apps.contract.db.ContractVersion;
 import com.axelor.apps.contract.db.repo.ContractVersionRepository;
 import com.axelor.apps.contract.exception.IExceptionMessage;
 import com.axelor.auth.AuthUtils;
+import com.axelor.auth.db.User;
 import com.axelor.exception.AxelorException;
 import com.axelor.exception.db.repo.TraceBackRepository;
 import com.axelor.i18n.I18n;
@@ -31,6 +32,7 @@ import com.google.inject.Inject;
 import com.google.inject.persist.Transactional;
 import java.time.LocalDate;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 public class ContractVersionServiceImpl extends ContractVersionRepository
@@ -45,11 +47,18 @@ public class ContractVersionServiceImpl extends ContractVersionRepository
 
   @Override
   public void waiting(ContractVersion version) throws AxelorException {
-    waiting(version, appBaseService.getTodayDate());
+    waiting(
+        version,
+        appBaseService.getTodayDate(
+            version.getContract() != null
+                ? version.getContract().getCompany()
+                : Optional.ofNullable(AuthUtils.getUser())
+                    .map(User::getActiveCompany)
+                    .orElse(null)));
   }
 
   @Override
-  @Transactional(rollbackOn = {AxelorException.class, RuntimeException.class})
+  @Transactional(rollbackOn = {Exception.class})
   public void waiting(ContractVersion version, LocalDate date) throws AxelorException {
 
     Contract contract =
@@ -74,11 +83,18 @@ public class ContractVersionServiceImpl extends ContractVersionRepository
 
   @Override
   public void ongoing(ContractVersion version) throws AxelorException {
-    ongoing(version, appBaseService.getTodayDate());
+    ongoing(
+        version,
+        appBaseService.getTodayDate(
+            version.getContract() != null
+                ? version.getContract().getCompany()
+                : Optional.ofNullable(AuthUtils.getUser())
+                    .map(User::getActiveCompany)
+                    .orElse(null)));
   }
 
   @Override
-  @Transactional(rollbackOn = {AxelorException.class, RuntimeException.class})
+  @Transactional(rollbackOn = {Exception.class})
   public void ongoing(ContractVersion version, LocalDate date) throws AxelorException {
     version.setActivationDate(date);
     version.setActivatedByUser(AuthUtils.getUser());
@@ -106,7 +122,14 @@ public class ContractVersionServiceImpl extends ContractVersionRepository
 
   @Override
   public void terminate(ContractVersion version) {
-    terminate(version, appBaseService.getTodayDate());
+    terminate(
+        version,
+        appBaseService.getTodayDate(
+            version.getContract() != null
+                ? version.getContract().getCompany()
+                : Optional.ofNullable(AuthUtils.getUser())
+                    .map(User::getActiveCompany)
+                    .orElse(null)));
   }
 
   @Override

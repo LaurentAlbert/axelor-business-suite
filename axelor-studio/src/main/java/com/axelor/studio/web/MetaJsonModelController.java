@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -17,24 +17,35 @@
  */
 package com.axelor.studio.web;
 
+import com.axelor.common.ObjectUtils;
+import com.axelor.exception.service.TraceBackService;
+import com.axelor.inject.Beans;
 import com.axelor.meta.db.MetaJsonModel;
 import com.axelor.meta.schema.actions.ActionView;
 import com.axelor.meta.schema.actions.ActionView.ActionViewBuilder;
 import com.axelor.rpc.ActionRequest;
 import com.axelor.rpc.ActionResponse;
+import com.axelor.studio.db.MenuBuilder;
 import com.axelor.studio.db.Wkf;
+import com.axelor.studio.db.repo.MenuBuilderRepo;
+import com.axelor.studio.db.repo.MenuBuilderRepository;
+import com.axelor.studio.db.repo.MetaJsonModelRepo;
 import com.axelor.studio.db.repo.WkfRepository;
-import com.google.inject.Inject;
+import com.axelor.studio.service.StudioMetaService;
+import com.google.inject.persist.Transactional;
+import java.util.stream.Collectors;
 
 public class MetaJsonModelController {
-
-  @Inject private WkfRepository wkfRepo;
 
   public void openWorkflow(ActionRequest request, ActionResponse response) {
 
     MetaJsonModel jsonModel = request.getContext().asType(MetaJsonModel.class);
 
-    Wkf wkf = wkfRepo.all().filter("self.model = ?1", jsonModel.getName()).fetchOne();
+    Wkf wkf =
+        Beans.get(WkfRepository.class)
+            .all()
+            .filter("self.model = ?1", jsonModel.getName())
+            .fetchOne();
 
     ActionViewBuilder builder =
         ActionView.define("Workflow").add("form", "wkf-form").model("com.axelor.studio.db.Wkf");
@@ -46,5 +57,67 @@ public class MetaJsonModelController {
     }
 
     response.setView(builder.map());
+  }
+
+  public void trackJsonField(ActionRequest request, ActionResponse response) {
+    try {
+      MetaJsonModel jsonModel = request.getContext().asType(MetaJsonModel.class);
+
+      String jsonFieldTracking =
+          request.getContext().get("jsonFieldTracking") != null
+              ? request.getContext().get("jsonFieldTracking").toString()
+              : "";
+
+      if (!jsonFieldTracking.isEmpty()) {
+        Beans.get(StudioMetaService.class)
+            .trackingFields(jsonModel, jsonFieldTracking, "Field added");
+        response.setValue("$jsonFieldTracking", null);
+        return;
+      }
+
+      Beans.get(StudioMetaService.class).trackJsonField(jsonModel);
+
+    } catch (Exception e) {
+      TraceBackService.trace(response, e);
+    }
+  }
+
+  public void setJsonFieldTracking(ActionRequest request, ActionResponse response) {
+
+    try {
+      MetaJsonModel jsonModel = request.getContext().asType(MetaJsonModel.class);
+
+      if (jsonModel.getId() != null || ObjectUtils.isEmpty(jsonModel.getFields())) {
+        response.setValue("$jsonFieldTracking", null);
+        return;
+      }
+
+      String jsonFields =
+          jsonModel.getFields().stream()
+              .map(list -> list.getName())
+              .collect(Collectors.joining(", "));
+
+      response.setValue("$jsonFieldTracking", jsonFields);
+    } catch (Exception e) {
+      TraceBackService.trace(response, e);
+    }
+  }
+
+  @Transactional
+  public void removeMenuBuilder(ActionRequest request, ActionResponse response) {
+
+    MetaJsonModel metaJsonModel = request.getContext().asType(MetaJsonModel.class);
+    if (metaJsonModel.getMenuBuilder() != null
+        && metaJsonModel.getMenuBuilder().getId() != null
+        && metaJsonModel.getMenuBuilder().getMetaMenu() != null) {
+      MenuBuilder menuBuilder =
+          Beans.get(MenuBuilderRepository.class).find(metaJsonModel.getMenuBuilder().getId());
+
+      metaJsonModel = Beans.get(MetaJsonModelRepo.class).find(metaJsonModel.getId());
+      metaJsonModel.setMenuBuilder(null);
+      Beans.get(MetaJsonModelRepo.class).save(metaJsonModel);
+      Beans.get(MenuBuilderRepo.class).remove(menuBuilder);
+      response.setReload(true);
+    }
   }
 }

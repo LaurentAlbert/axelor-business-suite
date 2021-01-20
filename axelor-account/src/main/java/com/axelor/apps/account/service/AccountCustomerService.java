@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -151,7 +151,7 @@ public class AccountCustomerService {
                 1,
                 Date.from(
                     appBaseService
-                        .getTodayDate()
+                        .getTodayDate(company)
                         .atStartOfDay()
                         .atZone(ZoneOffset.UTC)
                         .toInstant()),
@@ -222,13 +222,14 @@ public class AccountCustomerService {
                     + "LEFT JOIN public.account_invoice AS invoice ON (move.invoice = invoice.id) "
                     + "WHERE ml.partner = ?3 AND move.company = ?4 AND move.ignore_in_debt_recovery_ok in ('false', null) "
                     + "AND move.ignore_in_accounting_ok IN ('false', null) AND account.use_for_partner_balance = 'true'"
-                    + "AND (move.status_select = ?5 OR move.status_select = ?6) AND ml.amount_remaining > 0 AND invoice.debt_recovery_blocking_ok = FALSE ")
+                    + "AND (move.status_select = ?5 OR move.status_select = ?6) AND ml.amount_remaining > 0 "
+                    + "AND (invoice IS NULL OR invoice.debt_recovery_blocking_ok = FALSE) ")
             .setParameter(1, mailTransitTime)
             .setParameter(
                 2,
                 Date.from(
                     appBaseService
-                        .getTodayDate()
+                        .getTodayDate(company)
                         .atStartOfDay()
                         .atZone(ZoneOffset.UTC)
                         .toInstant()),
@@ -294,7 +295,7 @@ public class AccountCustomerService {
     }
   }
 
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public void flagPartners(List<Partner> partnerList, Company company) throws AxelorException {
     for (Partner partner : partnerList) {
       AccountingSituation accountingSituation =
@@ -310,7 +311,7 @@ public class AccountCustomerService {
     }
   }
 
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public AccountingSituation updateAccountingSituationCustomerAccount(
       AccountingSituation accountingSituation,
       boolean updateCustAccount,

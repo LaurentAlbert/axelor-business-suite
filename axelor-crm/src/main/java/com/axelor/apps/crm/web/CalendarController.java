@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -41,6 +41,7 @@ public class CalendarController {
             .add("calendar", "event-calendar-color-by-calendar")
             .add("grid", "event-grid")
             .add("form", "event-form")
+            .param("search-filters", "event-filters")
             .context("_typeSelect", 2)
             .domain(
                 "self.user.id = :_userId or self.calendar.user.id = :_userId or :_userId IN (SELECT attendee.user FROM self.attendees attendee) or self.organizer.user.id = :_userId")

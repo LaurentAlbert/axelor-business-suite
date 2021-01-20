@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -39,7 +39,7 @@ import com.axelor.apps.tool.QueryBuilder;
 import com.axelor.db.JPA;
 import com.axelor.db.Query;
 import com.axelor.exception.AxelorException;
-import com.axelor.exception.db.IException;
+import com.axelor.exception.db.repo.ExceptionOriginRepository;
 import com.axelor.exception.service.TraceBackService;
 import com.axelor.i18n.I18n;
 import com.axelor.inject.Beans;
@@ -67,7 +67,7 @@ public class BatchDirectDebitPaymentSchedule extends BatchDirectDebit {
         findBatch();
         batchBankPaymentService.createBankOrderFromPaymentScheduleLines(batch);
       } catch (Exception e) {
-        TraceBackService.trace(e, IException.DIRECT_DEBIT, batch.getId());
+        TraceBackService.trace(e, ExceptionOriginRepository.DIRECT_DEBIT, batch.getId());
         logger.error(e.getLocalizedMessage());
       }
     }
@@ -94,21 +94,26 @@ public class BatchDirectDebitPaymentSchedule extends BatchDirectDebit {
       Preconditions.checkNotNull(
           companyBankDetails.getCurrency(),
           I18n.get("Currency in company bank details is missing."));
-      Preconditions.checkArgument(
-          new File(accountingBatch.getPaymentMode().getBankOrderExportFolderPath()).exists(),
-          String.format(
-              I18n.get("Bank order export folder does not exist: %s"),
-              accountingBatch.getPaymentMode().getBankOrderExportFolderPath()));
 
-      BankPaymentConfigService bankPaymentConfigService = Beans.get(BankPaymentConfigService.class);
-
+      String bankOrderExportPath = accountingBatch.getPaymentMode().getBankOrderExportFolderPath();
+      String dataExpotDir;
       try {
+        dataExpotDir = appBaseService.getDataExportDir();
+
+        BankPaymentConfigService bankPaymentConfigService =
+            Beans.get(BankPaymentConfigService.class);
+
         BankPaymentConfig bankPaymentConfig =
             bankPaymentConfigService.getBankPaymentConfig(accountingBatch.getCompany());
         bankPaymentConfigService.getIcsNumber(bankPaymentConfig);
       } catch (AxelorException e) {
         throw new RuntimeException(e);
       }
+      Preconditions.checkArgument(
+          bankOrderExportPath != null && new File(dataExpotDir + bankOrderExportPath).exists(),
+          String.format(
+              I18n.get("Bank order export folder does not exist: %s"),
+              dataExpotDir + bankOrderExportPath));
     }
 
     QueryBuilder<PaymentScheduleLine> queryBuilder = QueryBuilder.of(PaymentScheduleLine.class);
@@ -125,7 +130,7 @@ public class BatchDirectDebitPaymentSchedule extends BatchDirectDebit {
     LocalDate dueDate =
         accountingBatch.getDueDate() != null
             ? accountingBatch.getDueDate()
-            : Beans.get(AppBaseService.class).getTodayDate();
+            : Beans.get(AppBaseService.class).getTodayDate(accountingBatch.getCompany());
     queryBuilder.add("self.scheduleDate <= :dueDate");
     queryBuilder.bind("dueDate", dueDate);
 
@@ -138,14 +143,16 @@ public class BatchDirectDebitPaymentSchedule extends BatchDirectDebit {
     queryBuilder.add(
         "self.paymentSchedule.partner.id NOT IN (SELECT DISTINCT partner.id FROM Partner partner LEFT JOIN partner.blockingList blocking WHERE blocking.blockingSelect = :blockingSelect AND blocking.blockingToDate >= :blockingToDate)");
     queryBuilder.bind("blockingSelect", BlockingRepository.DEBIT_BLOCKING);
-    queryBuilder.bind("blockingToDate", Beans.get(AppBaseService.class).getTodayDate());
+    queryBuilder.bind(
+        "blockingToDate",
+        Beans.get(AppBaseService.class).getTodayDate(accountingBatch.getCompany()));
 
     if (accountingBatch.getBankDetails() != null) {
       Set<BankDetails> bankDetailsSet = Sets.newHashSet(accountingBatch.getBankDetails());
 
       if (accountingBatch.getIncludeOtherBankAccounts()
           && appBaseService.getAppBase().getManageMultiBanks()) {
-        bankDetailsSet.addAll(accountingBatch.getCompany().getBankDetailsSet());
+        bankDetailsSet.addAll(accountingBatch.getCompany().getBankDetailsList());
       }
 
       queryBuilder.add(
@@ -187,7 +194,12 @@ public class BatchDirectDebitPaymentSchedule extends BatchDirectDebit {
             PaymentSchedule paymentSchedule = paymentScheduleLine.getPaymentSchedule();
             BankDetails bankDetails = paymentScheduleService.getBankDetails(paymentSchedule);
             Preconditions.checkArgument(
-                bankDetails.getActive(), I18n.get("Bank details are inactive."));
+                bankDetails.getActive(),
+                bankDetails.getPartner() != null
+                    ? bankDetails.getPartner().getFullName()
+                        + " - "
+                        + I18n.get("Bank details are inactive.")
+                    : I18n.get("Bank details are inactive."));
 
             if (directDebitPaymentMode.getOrderTypeSelect()
                 == PaymentModeRepository.ORDER_TYPE_SEPA_DIRECT_DEBIT) {
@@ -202,7 +214,7 @@ public class BatchDirectDebitPaymentSchedule extends BatchDirectDebit {
               paymentScheduleLine, companyBankDetails, directDebitPaymentMode);
           incrementDone(paymentScheduleLine);
         } catch (Exception e) {
-          TraceBackService.trace(e, IException.DIRECT_DEBIT, batch.getId());
+          TraceBackService.trace(e, ExceptionOriginRepository.DIRECT_DEBIT, batch.getId());
           incrementAnomaly(paymentScheduleLine);
           break;
         }

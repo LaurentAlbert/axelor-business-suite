@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -17,20 +17,21 @@
  */
 package com.axelor.tool.template;
 
+import com.axelor.apps.tool.date.DateTool;
 import com.axelor.apps.tool.exception.IExceptionMessage;
 import com.axelor.auth.AuthUtils;
+import com.axelor.common.StringUtils;
 import com.axelor.db.Model;
 import com.axelor.db.mapper.Mapper;
 import com.axelor.db.mapper.Property;
 import com.axelor.i18n.I18n;
-import com.axelor.inject.Beans;
-import com.axelor.meta.db.MetaSelectItem;
-import com.axelor.meta.db.repo.MetaSelectItemRepository;
+import com.axelor.meta.MetaStore;
+import com.axelor.meta.schema.views.Selection;
 import com.axelor.rpc.Resource;
-import com.beust.jcommander.internal.Maps;
 import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import com.google.common.collect.Maps;
 import com.google.common.io.Files;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -61,9 +62,12 @@ public class TemplateMaker {
   private String template;
   private STGroup stGroup;
   private Locale locale;
+  private String timeZone;
 
-  public TemplateMaker(Locale locale, char delimiterStartChar, char delimiterStopChar) {
+  public TemplateMaker(
+      String timeZone, Locale locale, char delimiterStartChar, char delimiterStopChar) {
     this.locale = locale;
+    this.timeZone = timeZone;
     this.stGroup = new STGroup(delimiterStartChar, delimiterStopChar);
     // Custom renderer
     this.stGroup.registerModelAdaptor(Model.class, new ModelFormatRenderer());
@@ -91,6 +95,14 @@ public class TemplateMaker {
   public void setContext(Model model, Map<String, Object> map, String nameInContext) {
     Preconditions.checkNotNull(model);
     this.context = makeContext(nameInContext, model, map);
+  }
+
+  public void addContext(String nameInContext, Object object) {
+    if (this.context == null) {
+      this.context = Maps.newHashMap();
+    }
+
+    this.context.put(nameInContext, object);
   }
 
   private Map<String, Object> makeContext(
@@ -148,6 +160,14 @@ public class TemplateMaker {
     return model.getClass();
   }
 
+  public void setLocale(Locale locale) {
+    this.locale = locale;
+  }
+
+  public Locale getLocale() {
+    return locale;
+  }
+
   public String make() {
     if (Strings.isNullOrEmpty(this.template)) {
       throw new IllegalArgumentException(I18n.get(IExceptionMessage.TEMPLATE_MAKER_2));
@@ -165,9 +185,9 @@ public class TemplateMaker {
 
     // Internal context
     _map.put("__user__", AuthUtils.getUser());
-    _map.put("__date__", LocalDate.now());
+    _map.put("__date__", DateTool.getTodayDate(timeZone));
     _map.put("__time__", LocalTime.now());
-    _map.put("__datetime__", LocalDateTime.now());
+    _map.put("__datetime__", DateTool.getTodayDateTime(timeZone));
 
     for (String key : _map.keySet()) {
       Object value = _map.get(key);
@@ -194,16 +214,17 @@ public class TemplateMaker {
       if (value == null) {
         return "";
       }
-      MetaSelectItem item =
-          Beans.get(MetaSelectItemRepository.class)
-              .all()
-              .filter("self.select.name = ?1 AND self.value = ?2", prop.getSelection(), value)
-              .fetchOne();
 
-      if (item != null) {
-        return item.getTitle();
+      Selection.Option option = MetaStore.getSelectionItem(prop.getSelection(), value.toString());
+      if (option == null) {
+        return value.toString();
       }
-      return value == null ? "" : value.toString();
+
+      if (StringUtils.notBlank(option.getTitle())) {
+        return I18n.getBundle(locale).getString(option.getTitle());
+      }
+
+      return option.getValue();
     }
 
     @Override

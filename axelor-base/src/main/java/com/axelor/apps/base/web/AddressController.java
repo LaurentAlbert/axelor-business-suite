@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -33,15 +33,17 @@ import com.axelor.apps.base.service.AddressService;
 import com.axelor.apps.base.service.MapService;
 import com.axelor.apps.base.service.PartnerService;
 import com.axelor.apps.base.service.app.AppBaseService;
+import com.axelor.apps.base.service.app.AppService;
 import com.axelor.auth.AuthUtils;
+import com.axelor.auth.db.User;
 import com.axelor.db.mapper.Mapper;
+import com.axelor.exception.AxelorException;
 import com.axelor.exception.service.TraceBackService;
 import com.axelor.i18n.I18n;
 import com.axelor.inject.Beans;
 import com.axelor.rpc.ActionRequest;
 import com.axelor.rpc.ActionResponse;
 import com.axelor.rpc.Context;
-import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import com.qas.web_2005_02.AddressLineType;
 import com.qas.web_2005_02.PicklistEntryType;
@@ -62,10 +64,6 @@ import org.slf4j.LoggerFactory;
 
 @Singleton
 public class AddressController {
-
-  @Inject private AddressService addressService;
-
-  @Inject protected AppBaseService appBaseService;
 
   private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
@@ -89,7 +87,7 @@ public class AddressController {
     String search = a.getAddressL4() + " " + a.getAddressL6();
     Map<String, Object> retDict =
         Beans.get(AddressService.class)
-            .validate(appBaseService.getAppBase().getQasWsdlUrl(), search);
+            .validate(Beans.get(AppBaseService.class).getAppBase().getQasWsdlUrl(), search);
     LOG.debug("validate retDict = {}", retDict);
 
     VerifyLevelType verifyLevel = (VerifyLevelType) retDict.get("verifyLevel");
@@ -118,7 +116,7 @@ public class AddressController {
             || verifyLevel.value().equals("PremisesPartial"))) {
       LOG.debug("retDict.verifyLevel = {}", retDict.get("verifyLevel"));
       QAPicklistType qaPicklist = (QAPicklistType) retDict.get("qaPicklist");
-      List<PickListEntry> pickList = new ArrayList<PickListEntry>();
+      List<PickListEntry> pickList = new ArrayList<>();
       if (qaPicklist != null) {
         for (PicklistEntryType p : qaPicklist.getPicklistEntry()) {
           PickListEntry e = new PickListEntry();
@@ -159,7 +157,7 @@ public class AddressController {
     Address a = request.getContext().asType(Address.class);
     PickListEntry pickedEntry = null;
 
-    if (a.getPickList().size() > 0) {
+    if (!a.getPickList().isEmpty()) {
 
       // if (a.pickList*.selected.count { it == true} > 0)
       //	pickedEntry = a.pickList.find {it.selected == true}
@@ -169,7 +167,7 @@ public class AddressController {
       if (moniker != null) {
         com.qas.web_2005_02.Address address =
             Beans.get(AddressService.class)
-                .select(appBaseService.getAppBase().getQasWsdlUrl(), moniker);
+                .select(Beans.get(AppBaseService.class).getAppBase().getQasWsdlUrl(), moniker);
         LOG.debug("select address = {}", address);
         // addressL4: title="N° et Libellé de la voie"
         // addressL6: title="Code Postal - Commune"/>
@@ -196,20 +194,29 @@ public class AddressController {
     } else response.setFlash(I18n.get(IExceptionMessage.ADDRESS_4));
   }
 
-  public void export(ActionRequest request, ActionResponse response) throws IOException {
+  public void export(ActionRequest request, ActionResponse response)
+      throws IOException, AxelorException {
 
     AddressExport addressExport = request.getContext().asType(AddressExport.class);
+    String dataExportDir = Beans.get(AppService.class).getDataExportDir();
 
-    int size = Beans.get(AddressService.class).export(addressExport.getPath());
+    String addressExportPath = addressExport.getPath();
+    if (addressExportPath == null) {
+      addressExportPath = "adresses.csv";
+    }
+
+    int size = Beans.get(AddressService.class).export(dataExportDir + addressExportPath);
 
     response.setValue("log", size + " adresses exportées");
   }
 
   public void viewMap(ActionRequest request, ActionResponse response) {
+
     try {
       Address address = request.getContext().asType(Address.class);
       address = Beans.get(AddressRepository.class).find(address.getId());
-      Optional<Pair<BigDecimal, BigDecimal>> latLong = addressService.getOrUpdateLatLong(address);
+      Optional<Pair<BigDecimal, BigDecimal>> latLong =
+          Beans.get(AddressService.class).getOrUpdateLatLong(address);
 
       if (latLong.isPresent()) {
         MapService mapService = Beans.get(MapService.class);
@@ -229,14 +236,17 @@ public class AddressController {
   }
 
   public void viewDirection(ActionRequest request, ActionResponse response) {
+    AddressRepository addressRepository = Beans.get(AddressRepository.class);
     try {
       MapService mapService = Beans.get(MapService.class);
       String key = null;
-      if (appBaseService.getAppBase().getMapApiSelect() == AppBaseRepository.MAP_API_GOOGLE) {
+      if (Beans.get(AppBaseService.class).getAppBase().getMapApiSelect()
+          == AppBaseRepository.MAP_API_GOOGLE) {
         key = mapService.getGoogleMapsApiKey();
       }
 
-      Company company = AuthUtils.getUser().getActiveCompany();
+      Company company =
+          Optional.ofNullable(AuthUtils.getUser()).map(User::getActiveCompany).orElse(null);
       if (company == null) {
         response.setFlash(I18n.get(IExceptionMessage.PRODUCT_NO_ACTIVE_COMPANY));
         return;
@@ -247,9 +257,9 @@ public class AddressController {
         return;
       }
 
-      departureAddress = Beans.get(AddressRepository.class).find(departureAddress.getId());
+      departureAddress = addressRepository.find(departureAddress.getId());
       Optional<Pair<BigDecimal, BigDecimal>> departureLatLong =
-          addressService.getOrUpdateLatLong(departureAddress);
+          Beans.get(AddressService.class).getOrUpdateLatLong(departureAddress);
 
       if (!departureLatLong.isPresent()) {
         response.setFlash(
@@ -258,9 +268,9 @@ public class AddressController {
       }
 
       Address arrivalAddress = request.getContext().asType(Address.class);
-      arrivalAddress = Beans.get(AddressRepository.class).find(arrivalAddress.getId());
+      arrivalAddress = addressRepository.find(arrivalAddress.getId());
       Optional<Pair<BigDecimal, BigDecimal>> arrivalLatLong =
-          addressService.getOrUpdateLatLong(arrivalAddress);
+          Beans.get(AddressService.class).getOrUpdateLatLong(arrivalAddress);
 
       if (!arrivalLatLong.isPresent()) {
         response.setFlash(
@@ -282,6 +292,7 @@ public class AddressController {
   }
 
   public void updateLatLong(ActionRequest request, ActionResponse response) {
+    AddressService addressService = Beans.get(AddressService.class);
     try {
       Address address = request.getContext().asType(Address.class);
       address = Beans.get(AddressRepository.class).find(address.getId());
@@ -347,5 +358,11 @@ public class AddressController {
       partnerService.addPartnerAddress(partner, address, isDefault, invoicing, delivery);
       partnerService.savePartner(partner);
     }
+  }
+
+  public void autocompleteAddress(ActionRequest request, ActionResponse response) {
+    Address address = request.getContext().asType(Address.class);
+    Beans.get(AddressService.class).autocompleteAddress(address);
+    response.setValues(address);
   }
 }

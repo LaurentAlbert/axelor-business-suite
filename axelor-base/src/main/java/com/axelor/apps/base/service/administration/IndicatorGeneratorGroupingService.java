@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -21,6 +21,7 @@ import com.axelor.apps.base.db.IndicatorGenerator;
 import com.axelor.apps.base.db.IndicatorGeneratorGrouping;
 import com.axelor.apps.base.db.repo.IndicatorGeneratorGroupingRepository;
 import com.axelor.apps.base.exceptions.IExceptionMessage;
+import com.axelor.apps.base.service.app.AppService;
 import com.axelor.apps.tool.file.CsvTool;
 import com.axelor.exception.AxelorException;
 import com.axelor.i18n.I18n;
@@ -36,7 +37,9 @@ public class IndicatorGeneratorGroupingService {
 
   @Inject private IndicatorGeneratorGroupingRepository iggRepo;
 
-  @Transactional
+  @Inject private AppService appService;
+
+  @Transactional(rollbackOn = {Exception.class})
   public void run(IndicatorGeneratorGrouping indicatorGeneratorGrouping) throws AxelorException {
 
     String log = "";
@@ -69,10 +72,11 @@ public class IndicatorGeneratorGroupingService {
     iggRepo.save(indicatorGeneratorGrouping);
   }
 
-  @Transactional
+  @Transactional(rollbackOn = {Exception.class})
   public void export(IndicatorGeneratorGrouping indicatorGeneratorGrouping) throws AxelorException {
 
     String log = "";
+    String dataExportDir = appService.getDataExportDir();
 
     if (indicatorGeneratorGrouping.getPath() == null
         || indicatorGeneratorGrouping.getPath().isEmpty()) {
@@ -102,7 +106,9 @@ public class IndicatorGeneratorGroupingService {
 
     try {
       CsvTool.csvWriter(
-          indicatorGeneratorGrouping.getPath(),
+          indicatorGeneratorGrouping.getPath() == null
+              ? null
+              : dataExportDir + indicatorGeneratorGrouping.getPath(),
           indicatorGeneratorGrouping.getCode() + ".csv",
           ';',
           null,

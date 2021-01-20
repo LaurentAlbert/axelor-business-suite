@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -21,6 +21,7 @@ import com.axelor.apps.base.db.Company;
 import com.axelor.apps.base.db.Currency;
 import com.axelor.apps.base.db.Partner;
 import com.axelor.apps.base.db.PriceList;
+import com.axelor.apps.base.db.TradingName;
 import com.axelor.apps.base.db.repo.PriceListRepository;
 import com.axelor.apps.base.service.PartnerPriceListService;
 import com.axelor.apps.base.service.PartnerService;
@@ -71,13 +72,13 @@ public class SaleOrderCreateServiceImpl implements SaleOrderCreateService {
   @Override
   public SaleOrder createSaleOrder(Company company) throws AxelorException {
     SaleOrder saleOrder = new SaleOrder();
-    saleOrder.setCreationDate(appSaleService.getTodayDate());
+    saleOrder.setCreationDate(appSaleService.getTodayDate(company));
     if (company != null) {
       saleOrder.setCompany(company);
       saleOrder.setCurrency(company.getCurrency());
     }
-    saleOrder.setSalemanUser(AuthUtils.getUser());
-    saleOrder.setTeam(saleOrder.getSalemanUser().getActiveTeam());
+    saleOrder.setSalespersonUser(AuthUtils.getUser());
+    saleOrder.setTeam(saleOrder.getSalespersonUser().getActiveTeam());
     saleOrder.setStatusSelect(SaleOrderRepository.STATUS_DRAFT_QUOTATION);
     saleOrderService.computeEndOfValidityDate(saleOrder);
     return saleOrder;
@@ -85,7 +86,7 @@ public class SaleOrderCreateServiceImpl implements SaleOrderCreateService {
 
   @Override
   public SaleOrder createSaleOrder(
-      User salemanUser,
+      User salespersonUser,
       Company company,
       Partner contactPartner,
       Currency currency,
@@ -95,16 +96,19 @@ public class SaleOrderCreateServiceImpl implements SaleOrderCreateService {
       LocalDate orderDate,
       PriceList priceList,
       Partner clientPartner,
-      Team team)
+      Team team,
+      TradingName tradingName)
       throws AxelorException {
 
     logger.debug(
         "Création d'un devis client : Société = {},  Reference externe = {}, Client = {}",
-        new Object[] {company, externalReference, clientPartner.getFullName()});
+        company,
+        externalReference,
+        clientPartner.getFullName());
 
     SaleOrder saleOrder = new SaleOrder();
     saleOrder.setClientPartner(clientPartner);
-    saleOrder.setCreationDate(appSaleService.getTodayDate());
+    saleOrder.setCreationDate(appSaleService.getTodayDate(company));
     saleOrder.setContactPartner(contactPartner);
     saleOrder.setCurrency(currency);
     saleOrder.setExternalReference(externalReference);
@@ -112,20 +116,20 @@ public class SaleOrderCreateServiceImpl implements SaleOrderCreateService {
     saleOrder.setOrderDate(orderDate);
 
     saleOrder.setPrintingSettings(
-        Beans.get(TradingNameService.class).getDefaultPrintingSettings(null, company));
+        Beans.get(TradingNameService.class).getDefaultPrintingSettings(tradingName, company));
 
-    if (salemanUser == null) {
-      salemanUser = AuthUtils.getUser();
+    if (salespersonUser == null) {
+      salespersonUser = AuthUtils.getUser();
     }
-    saleOrder.setSalemanUser(salemanUser);
+    saleOrder.setSalespersonUser(salespersonUser);
 
     if (team == null) {
-      team = salemanUser.getActiveTeam();
+      team = salespersonUser.getActiveTeam();
     }
     saleOrder.setTeam(team);
 
     if (company == null) {
-      company = salemanUser.getActiveCompany();
+      company = salespersonUser.getActiveCompany();
     }
     saleOrder.setCompany(company);
 
@@ -151,7 +155,7 @@ public class SaleOrderCreateServiceImpl implements SaleOrderCreateService {
   }
 
   @Override
-  @Transactional
+  @Transactional(rollbackOn = {Exception.class})
   public SaleOrder mergeSaleOrders(
       List<SaleOrder> saleOrderList,
       Currency currency,
@@ -187,7 +191,7 @@ public class SaleOrderCreateServiceImpl implements SaleOrderCreateService {
             null,
             numSeq,
             externalRef,
-            LocalDate.now(),
+            appSaleService.getTodayDate(company),
             priceList,
             clientPartner,
             team);
@@ -223,14 +227,35 @@ public class SaleOrderCreateServiceImpl implements SaleOrderCreateService {
   }
 
   @Override
-  @Transactional
-  public SaleOrder createSaleOrder(SaleOrder context) {
+  @Transactional(rollbackOn = {Exception.class})
+  public SaleOrder createSaleOrder(
+      SaleOrder context, Currency wizardCurrency, PriceList wizardPriceList)
+      throws AxelorException {
     SaleOrder copy = saleOrderRepo.copy(context, true);
+    copy.setCreationDate(appSaleService.getTodayDate(context.getCompany()));
+    copy.setCurrency(wizardCurrency);
+    copy.setPriceList(wizardPriceList);
+
+    saleOrderService.computeEndOfValidityDate(copy);
+
+    this.updateSaleOrderLineList(copy);
+
+    saleOrderComputeService.computeSaleOrder(copy);
+
     copy.setTemplate(false);
     copy.setTemplateUser(null);
-    copy.setCreationDate(appSaleService.getTodayDate());
-    saleOrderService.computeEndOfValidityDate(copy);
+
     return copy;
+  }
+
+  public void updateSaleOrderLineList(SaleOrder saleOrder) throws AxelorException {
+    List<SaleOrderLine> saleOrderLineList = saleOrder.getSaleOrderLineList();
+    if (saleOrderLineList != null) {
+      for (SaleOrderLine saleOrderLine : saleOrderLineList) {
+        Beans.get(SaleOrderLineService.class).fillPrice(saleOrderLine, saleOrder);
+        Beans.get(SaleOrderLineService.class).computeValues(saleOrder, saleOrderLine);
+      }
+    }
   }
 
   @Override

@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -51,6 +51,8 @@ public class ManufOrderManagementRepository extends ManufOrderRepository {
     entity.setProducedStockMoveLineList(null);
     entity.setWasteProdProductList(null);
     entity.setOperationOrderList(null);
+    entity.setCostSheetList(null);
+    entity.setCostPrice(null);
     return super.copy(entity, deep);
   }
 
@@ -67,9 +69,11 @@ public class ManufOrderManagementRepository extends ManufOrderRepository {
       throw new PersistenceException(e);
     }
 
-    for (OperationOrder operationOrder : entity.getOperationOrderList()) {
-      if (operationOrder.getBarCode() == null) {
-        operationOrderService.createBarcode(operationOrder);
+    if (entity.getOperationOrderList() != null) {
+      for (OperationOrder operationOrder : entity.getOperationOrderList()) {
+        if (operationOrder.getBarCode() == null) {
+          operationOrderService.createBarcode(operationOrder);
+        }
       }
     }
     return super.save(entity);

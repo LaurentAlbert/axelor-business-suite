@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -25,6 +25,7 @@ import com.axelor.apps.base.service.PartnerPriceListService;
 import com.axelor.apps.base.service.app.AppBaseService;
 import com.axelor.apps.purchase.db.PurchaseOrder;
 import com.axelor.apps.purchase.db.repo.PurchaseOrderRepository;
+import com.axelor.apps.purchase.service.PurchaseOrderService;
 import com.axelor.apps.purchase.service.config.PurchaseConfigService;
 import com.axelor.apps.sale.db.SaleOrder;
 import com.axelor.apps.sale.db.SaleOrderLine;
@@ -49,15 +50,18 @@ public class SaleOrderPurchaseServiceImpl implements SaleOrderPurchaseService {
 
   private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-  protected PurchaseOrderServiceSupplychainImpl purchaseOrderServiceSupplychainImpl;
-  protected PurchaseOrderLineServiceSupplychainImpl purchaseOrderLineServiceSupplychainImpl;
+  protected PurchaseOrderSupplychainService purchaseOrderSupplychainService;
+  protected PurchaseOrderLineServiceSupplyChain purchaseOrderLineServiceSupplychain;
+  protected PurchaseOrderService purchaseOrderService;
 
   @Inject
   public SaleOrderPurchaseServiceImpl(
-      PurchaseOrderServiceSupplychainImpl purchaseOrderServiceSupplychainImpl,
-      PurchaseOrderLineServiceSupplychainImpl purchaseOrderLineServiceSupplychainImpl) {
-    this.purchaseOrderServiceSupplychainImpl = purchaseOrderServiceSupplychainImpl;
-    this.purchaseOrderLineServiceSupplychainImpl = purchaseOrderLineServiceSupplychainImpl;
+      PurchaseOrderSupplychainService purchaseOrderSupplychainService,
+      PurchaseOrderLineServiceSupplyChain purchaseOrderLineServiceSupplychain,
+      PurchaseOrderService purchaseOrderService) {
+    this.purchaseOrderSupplychainService = purchaseOrderSupplychainService;
+    this.purchaseOrderLineServiceSupplychain = purchaseOrderLineServiceSupplychain;
+    this.purchaseOrderService = purchaseOrderService;
   }
 
   @Override
@@ -105,7 +109,7 @@ public class SaleOrderPurchaseServiceImpl implements SaleOrderPurchaseService {
   }
 
   @Override
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public PurchaseOrder createPurchaseOrder(
       Partner supplierPartner, List<SaleOrderLine> saleOrderLineList, SaleOrder saleOrder)
       throws AxelorException {
@@ -115,7 +119,7 @@ public class SaleOrderPurchaseServiceImpl implements SaleOrderPurchaseService {
         saleOrder.getSaleOrderSeq());
 
     PurchaseOrder purchaseOrder =
-        purchaseOrderServiceSupplychainImpl.createPurchaseOrder(
+        purchaseOrderSupplychainService.createPurchaseOrder(
             AuthUtils.getUser(),
             saleOrder.getCompany(),
             supplierPartner.getContactPartnerSet().size() == 1
@@ -125,9 +129,11 @@ public class SaleOrderPurchaseServiceImpl implements SaleOrderPurchaseService {
             null,
             saleOrder.getSaleOrderSeq(),
             saleOrder.getExternalReference(),
-            Beans.get(StockLocationService.class)
-                .getDefaultReceiptStockLocation(saleOrder.getCompany()),
-            Beans.get(AppBaseService.class).getTodayDate(),
+            saleOrder.getDirectOrderLocation()
+                ? saleOrder.getStockLocation()
+                : Beans.get(StockLocationService.class)
+                    .getDefaultReceiptStockLocation(saleOrder.getCompany()),
+            Beans.get(AppBaseService.class).getTodayDate(saleOrder.getCompany()),
             Beans.get(PartnerPriceListService.class)
                 .getDefaultPriceList(supplierPartner, PriceListRepository.TYPE_PURCHASE),
             supplierPartner,
@@ -148,11 +154,13 @@ public class SaleOrderPurchaseServiceImpl implements SaleOrderPurchaseService {
 
     for (SaleOrderLine saleOrderLine : saleOrderLineList) {
       purchaseOrder.addPurchaseOrderLineListItem(
-          purchaseOrderLineServiceSupplychainImpl.createPurchaseOrderLine(
+          purchaseOrderLineServiceSupplychain.createPurchaseOrderLine(
               purchaseOrder, saleOrderLine));
     }
 
-    purchaseOrderServiceSupplychainImpl.computePurchaseOrder(purchaseOrder);
+    purchaseOrderService.computePurchaseOrder(purchaseOrder);
+
+    purchaseOrder.setNotes(supplierPartner.getPurchaseOrderComments());
 
     Beans.get(PurchaseOrderRepository.class).save(purchaseOrder);
 

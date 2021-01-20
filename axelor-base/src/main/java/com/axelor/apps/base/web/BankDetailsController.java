@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -27,7 +27,6 @@ import com.axelor.i18n.I18n;
 import com.axelor.inject.Beans;
 import com.axelor.rpc.ActionRequest;
 import com.axelor.rpc.ActionResponse;
-import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import org.iban4j.IbanFormatException;
 import org.iban4j.InvalidCheckDigitException;
@@ -35,8 +34,6 @@ import org.iban4j.UnsupportedCountryException;
 
 @Singleton
 public class BankDetailsController {
-
-  @Inject private BankDetailsServiceImpl bds;
 
   public void validateIban(ActionRequest request, ActionResponse response) {
     response.setAttr("invalidIbanText", "hidden", true);
@@ -53,19 +50,19 @@ public class BankDetailsController {
         && bank.getBankDetailsTypeSelect() == BankRepository.BANK_IDENTIFIER_TYPE_IBAN) {
       try {
         Beans.get(BankDetailsService.class).validateIban(bankDetails.getIban());
-
-        bankDetails = bds.detailsIban(bankDetails);
+      } catch (IbanFormatException | InvalidCheckDigitException | UnsupportedCountryException e) {
+        if (request.getAction().endsWith("onchange")) {
+          response.setFlash(I18n.get(IExceptionMessage.BANK_DETAILS_1));
+        }
+        response.setAttr("invalidIbanText", "hidden", false);
+      } finally {
+        bankDetails = Beans.get(BankDetailsServiceImpl.class).detailsIban(bankDetails);
         if (bank.getCountry() != null && bank.getCountry().getAlpha2Code().equals("FR")) {
           response.setValue("bankCode", bankDetails.getBankCode());
           response.setValue("sortCode", bankDetails.getSortCode());
           response.setValue("accountNbr", bankDetails.getAccountNbr());
           response.setValue("bbanKey", bankDetails.getBbanKey());
         }
-      } catch (IbanFormatException | InvalidCheckDigitException | UnsupportedCountryException e) {
-        if (request.getAction().endsWith("onchange")) {
-          response.setFlash(I18n.get(IExceptionMessage.BANK_DETAILS_1));
-        }
-        response.setAttr("invalidIbanText", "hidden", false);
       }
     }
   }

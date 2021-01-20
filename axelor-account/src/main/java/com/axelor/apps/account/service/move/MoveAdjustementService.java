@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -65,7 +65,7 @@ public class MoveAdjustementService {
    * @return
    * @throws AxelorException
    */
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public void createAdjustmentDebitMove(MoveLine debitMoveLine) throws AxelorException {
 
     Partner partner = debitMoveLine.getPartner();
@@ -95,7 +95,7 @@ public class MoveAdjustementService {
             account,
             debitAmountRemaining,
             false,
-            appAccountService.getTodayDate(),
+            appAccountService.getTodayDate(company),
             1,
             null,
             null);
@@ -108,7 +108,7 @@ public class MoveAdjustementService {
             accountConfigService.getCashPositionVariationAccount(accountConfig),
             debitAmountRemaining,
             true,
-            appAccountService.getTodayDate(),
+            appAccountService.getTodayDate(company),
             2,
             null,
             null);
@@ -155,7 +155,7 @@ public class MoveAdjustementService {
             account,
             debitAmountRemaining,
             false,
-            appAccountService.getTodayDate(),
+            appAccountService.getTodayDate(company),
             1,
             null,
             null);
@@ -168,7 +168,7 @@ public class MoveAdjustementService {
             accountConfigService.getCashPositionVariationAccount(accountConfig),
             debitAmountRemaining,
             true,
-            appAccountService.getTodayDate(),
+            appAccountService.getTodayDate(company),
             2,
             null,
             null);
@@ -216,7 +216,7 @@ public class MoveAdjustementService {
             creditMoveLineToReconcile.getAccount(),
             amount,
             true,
-            appAccountService.getTodayDate(),
+            appAccountService.getTodayDate(company),
             1,
             null,
             null);
@@ -228,7 +228,7 @@ public class MoveAdjustementService {
             debitMoveLineToReconcile.getAccount(),
             amount,
             false,
-            appAccountService.getTodayDate(),
+            appAccountService.getTodayDate(company),
             2,
             null,
             null);

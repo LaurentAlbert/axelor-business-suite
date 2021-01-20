@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <object-views xmlns="http://axelor.com/xml/ns/object-views"
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://axelor.com/xml/ns/object-views http://axelor.com/xml/ns/object-views/object-views_5.0.xsd">
+	xsi:schemaLocation="http://axelor.com/xml/ns/object-views http://axelor.com/xml/ns/object-views/object-views_5.3.xsd">
 
 
 	<!-- Nomenclature : * name : "interfaceName" + "fieldName" + ".select" -->
@@ -21,6 +21,11 @@
 	
 	<selection name="iterritory.city.type.select">
 		<option value="geonames">Geonames</option>
+	</selection>
+	
+	<selection name="base.city.auto.import.type.select">
+		<option value="FR.zip">France</option>
+		<option value="allCountries.zip">All Countries</option>
 	</selection>
 
 	<selection name="partner.title.type.select">
@@ -46,8 +51,7 @@
 
 	<selection name='product.product.type.select'>
 		<option value='service'>Service</option>
-		<option value='storable'>Product</option>
-		<option value='pack'>Pack</option>
+		<option value='storable'>ProductType.product</option>
 	</selection>
 
 	<selection name='product.procurement.method.select'>
@@ -92,6 +96,7 @@
 	<selection name='iadministration.export.type.select'>
 		<option value="pdf">PDF</option>
 		<option value="xlsx">XLS</option>
+		<option value="ods">ODS</option>
 	</selection>
 
 	<selection name='iadministration.declaration.of.exchanges.export.type.select'>
@@ -102,15 +107,7 @@
 	<selection name="sequence.generic.code.select">
 		<option value="partner">Partner (Cust/Suppl)</option>
 		<option value="product">Product</option>
-	</selection>
-
-	<selection name="company.paybox.hash.select">
-		<option value="SHA512">SHA512</option>
-		<option value="SHA256">SHA256</option>
-		<option value="RIPEMD160">RIPEMD160</option>
-		<option value="SHA384">SHA384</option>
-		<option value="SHA224">SHA224</option>
-		<option value="MDC2">MDC2</option>
+        <option value="abcAnalysis">ABC Analysis</option>
 	</selection>
 
 	<!-- TODO à modifier, produit, taxe, paiement dans le code java ou les vues -->
@@ -124,12 +121,6 @@
 		<option value='2'>Calendar synchronization</option>
 	</selection>
 
-	<selection name="base.keyword.type.select">
-		<option value="1">Tools</option>
-		<option value="2">Sector</option>
-		<option value="3">Work</option>
-	</selection>
-	
 	<selection name="base.routing.rule.type.select">
 		<option value="1">Contains</option>
 		<option value="2">Not contains</option>
@@ -141,8 +132,14 @@
 		<option value="2">Open street map</option>
 	</selection>
 	
+	<selection name="base.app.base.osm.routing.api.select">
+		<option value="1">YOUR navigation</option>
+		<option value="2">OSRM</option>
+	</selection>
+	
 	<selection name="base.app.base.currency.api.select">
-		<option value="https://sdw-wsrest.ecb.europa.eu/service/data/EXR/D.%s+%s.EUR.SP00.A?startPeriod=%s&amp;endPeriod=%s">ECB</option>
+		<option value="com.axelor.apps.base.service.currency.ECBCurrencyConversionService">ECB</option>
+		<option value="com.axelor.apps.base.service.currency.FixerCurrencyConversionService">Fixer</option>
 	</selection>
 
 	<selection name="base.price.list.type.select">
@@ -157,7 +154,7 @@
 	</selection>
 
 	<selection name="base.price.list.line.amount.type.select">
-        <option value="0">No Discount</option>
+        <option value="0">No discount</option>
 		<option value="1">In %</option>
 		<option value="2">Fixed</option>
 	</selection>
@@ -215,11 +212,7 @@
 		<option value="2">BBAN</option>
 	</selection>
 
-	<!-- TODO: move this selection to account module and create a copy here
-		 (ie. base.year.period.duration.select) That time also rename references
-		 of this selection in Charts.xml of CRM, Purchase, Stock modules.
-	 -->	
-	<selection name="account.year.period.duration.select">
+	<selection name="base.year.period.duration.select">
 		<option value="1">1 Month</option>
 		<option value="2">2 Months</option>
 		<option value="3">3 Months</option>
@@ -257,6 +250,11 @@
 	<selection name="base.duration.type.select">
 		<option value="1">Month</option>
 		<option value="2">Day</option>
+	</selection>
+	
+	<selection name="base.duration.application.type.select">
+		<option value="1">Sale order</option>
+		<option value="2">Contract</option>
 	</selection>
 	
 	<selection name="base.compute.method.discount.select">
@@ -394,6 +392,7 @@
 
 	<selection name="meta.schedule.job.select">
 		<option value="com.axelor.mail.service.MailFetchJob">com.axelor.mail.service.MailFetchJob</option>
+		<option value="com.axelor.apps.base.job.GlobalTrackingLogCleaningJob">com.axelor.apps.base.job.GlobalTrackingLogCleaningJob</option>
 		<option value="com.axelor.apps.base.job.MailJob">com.axelor.apps.base.job.MailJob</option>
 		<option value="com.axelor.apps.base.job.BatchJob">com.axelor.apps.base.job.BatchJob</option>
 		<option value="com.axelor.apps.base.job.CurrencyConversionJob">com.axelor.apps.base.job.CurrencyConversionJob</option>
@@ -411,6 +410,7 @@
 	<selection name="base.cancel.reason.application.type.select">
 		<option value="com.axelor.apps.sale.db.SaleOrder">Sale order</option>
         <option value="com.axelor.apps.stock.db.StockMove">Stock move</option>
+        <option value="com.axelor.apps.account.db.Invoice">Invoice</option>
 	</selection>
 
  	<selection name="base.barcode.select">
@@ -435,6 +435,15 @@
     <selection id="base.object.data.config.model.select" name="object.data.config.model.select">
 		    <option value="com.axelor.apps.base.db.Partner">Partner</option>
 	  </selection>
+    
+    <selection name="base.user.form.step.select">
+		<option value="0">Basic overview</option>
+		<option value="1">Authorization details</option>
+		<option value="2">Contact / Partner</option>
+		<option value="3">Employee</option>
+		<option value="4">Activation</option>
+		<option value="5">Complete</option>
+    </selection>
 
 	<selection name="select.language" id="base.language.select">
 		<option value="de">German Beta</option>
@@ -445,5 +454,130 @@
 		<option value="pl">Polish Beta</option>
 		<option value="ru">Russian Beta</option>
 	</selection>
+
+  <selection name="frequency.base.type.select">
+    <option value="monthDays">Month days</option>
+    <option value="everyNWeeks">Every N weeks</option>
+  </selection>
+
+  <selection name="team.task.type.select">
+    <option value="task">Task</option>
+    <option value="ticket">Ticket</option>
+  </selection>
+  	
+  	<selection name="advanced.import.status.select">
+  		<option value="0">Draft</option>
+  		<option value="1">Validated</option>
+  	</selection>
+  
+  	<selection name="file.field.import.type.select">
+		<option value="0">Direct</option>
+		<option value="1">Find</option>
+		<option value="2">FindNew</option>
+		<option value="3">New</option>
+		<option value="4">Ignore/Empty</option>
+  	</selection>
+  
+	<selection name="file.field.for.select.use.select">
+		<option value="0">Titles</option>
+		<option value="1">Values</option>
+		<option value="2">Translated titles</option>
+	</selection>
+
+  <selection name="abc.analysis.type.select">
+	  <option value="com.axelor.apps.base.service.ABCAnalysisServiceImpl">Base</option>
+  </selection>
+
+  <selection name="abc.analysis.status.select">
+      <option value="1">Draft</option>
+	  <option value="2">Analyzing</option>
+      <option value="3">Finished</option>
+  </selection>
+
+	<selection name="order.by.type">
+		<option value="asc">Ascending</option>
+		<option value="desc">Descending</option>
+	</selection>	
+
+    <selection name="line.type.select">
+        <option value="0">Standard</option>
+        <option value="1">Title</option>
+    </selection>    
+    
+    <selection name='trace.back.origin.select' id="trace.back.origin.select.base" >
+    	<option value="import">Importing</option>
+    </selection>
+    
+    <selection name="base.print.template.format.select">
+       <option value="PDF">PDF</option>
+       <option value="WORD">WORD</option>
+       <option value="ODT">ODT</option>
+    </selection>
+    
+    <selection name="base.print.display.type.select">
+       <option value="1">Portrait</option>
+       <option value="2">Landscape</option>
+    </selection>
+    
+    <selection name="print.template.line.test.reference.select">
+    	<option value="Default" order="0" hidden="true">Default</option>
+    </selection>
+    
+    <selection name="base.print.settings.footer.font.select">
+    	<option value="Courier">Courier</option>
+    	<option value="Courier-Bold">Courier-Bold</option>
+    	<option value="Courier-Oblique">Courier-Oblique</option>
+    	<option value="Courier-BoldOblique">Courier-BoldOblique</option>
+    	<option value="Helvetica">Helvetica</option>
+    	<option value="Helvetica-Bold">Helvetica-Bold</option>
+    	<option value="Helvetica-Oblique">Helvetica-Oblique</option>
+    	<option value="Helvetica-BoldOblique">Helvetica-BoldOblique</option>
+    	<option value="Symbol">Symbol</option>
+    	<option value="Times-Roman">Times-Roman</option>
+    	<option value="Times">Times</option>
+    	<option value="Times-Bold">Times-Bold</option>
+    	<option value="Times-Italic">Times-Italic</option>
+    	<option value="Times-BoldItalic">Times-BoldItalic</option>
+    	<option value="ZapfDingbats">ZapfDingbats</option>
+    </selection>
+    
+    <selection name="base.print.settings.footer.text.alignment.select">
+    	<option value="left">Left</option>
+    	<option value="right">Right</option>
+    	<option value="center">Center</option>
+    </selection>
+    
+    <selection name="base.print.settings.footer.font.color.select">
+    	<option value="blue">blue</option>
+    	<option value="cyan">cyan</option>
+    	<option value="dark-gray">dark-gray</option>
+    	<option value="gray">gray</option>
+    	<option value="green">green</option>
+    	<option value="light-gray">light-gray</option>
+    	<option value="magneta">magneta</option>
+    	<option value="orange">orange</option>
+    	<option value="pink">pink</option>
+    	<option value="red">red</option>
+    	<option value="white">white</option>
+    	<option value="yellow">yellow</option>
+    </selection>
+
+	<selection name="company.timezone.select">
+		<option value="Europe/Paris">Europe/Paris</option>
+		<option value="America/New_York">America/New_York</option>
+	</selection>
 	
+	<selection name="base.import.configuration.status.select">
+		<option value="0">Draft</option>
+		<option value="1">In Progress</option>
+		<option value="2">Completed</option>
+		<option value="3">Error</option>
+	</selection>
+	
+	<selection name="user.partner.type.select">
+		<option value="1">Employee</option>
+		<option value="2">Contact</option>
+		<option value="3">Partner</option>
+	</selection>
+
 </object-views>

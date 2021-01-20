@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -25,6 +25,7 @@ import com.axelor.apps.message.service.MailAccountServiceImpl;
 import com.axelor.apps.message.service.MailServiceMessageImpl;
 import com.axelor.apps.message.service.MessageService;
 import com.axelor.apps.message.service.MessageServiceImpl;
+import com.axelor.apps.message.service.SendMailQueueService;
 import com.axelor.apps.message.service.TemplateMessageService;
 import com.axelor.apps.message.service.TemplateMessageServiceImpl;
 import com.axelor.mail.service.MailServiceImpl;
@@ -38,5 +39,7 @@ public class MessageModule extends AxelorModule {
     bind(MessageRepository.class).to(MessageManagementRepository.class);
     bind(MailAccountService.class).to(MailAccountServiceImpl.class);
     bind(MailServiceImpl.class).to(MailServiceMessageImpl.class);
+    // needed to use event notification methods
+    bind(SendMailQueueService.class);
   }
 }

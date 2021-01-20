@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -17,23 +17,21 @@
  */
 package com.axelor.apps.businessproject.web;
 
+import com.axelor.apps.account.db.AnalyticMoveLine;
+import com.axelor.apps.account.db.InvoiceLine;
 import com.axelor.apps.businessproject.exception.IExceptionMessage;
 import com.axelor.apps.businessproject.service.InvoiceLineProjectService;
 import com.axelor.apps.project.db.Project;
 import com.axelor.apps.project.db.repo.ProjectRepository;
 import com.axelor.exception.service.TraceBackService;
+import com.axelor.inject.Beans;
 import com.axelor.rpc.ActionRequest;
 import com.axelor.rpc.ActionResponse;
-import com.google.inject.Inject;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 public class InvoiceLineProjectController {
-
-  @Inject private InvoiceLineProjectService invoiceLineProjectService;
-
-  @Inject private ProjectRepository projectRepository;
 
   /**
    * Set project from context selected lines
@@ -42,10 +40,9 @@ public class InvoiceLineProjectController {
    * @param response
    */
   public void setCustomerInvoiceLineProject(ActionRequest request, ActionResponse response) {
-
     try {
       Project project = request.getContext().asType(Project.class);
-      project = projectRepository.find(project.getId());
+      project = Beans.get(ProjectRepository.class).find(project.getId());
 
       setCustomerInvoiceLineProject(request, response, project);
 
@@ -64,11 +61,10 @@ public class InvoiceLineProjectController {
       response.setFlash(IExceptionMessage.LINES_NOT_SELECTED);
     } else {
       List<Long> lineIds =
-          customerInvoiceLineSet
-              .stream()
+          customerInvoiceLineSet.stream()
               .map(it -> Long.parseLong(it.get("id").toString()))
               .collect(Collectors.toList());
-      invoiceLineProjectService.setProject(lineIds, project);
+      Beans.get(InvoiceLineProjectService.class).setProject(lineIds, project);
       response.setAttr("$customerInvoiceLineSet", "hidden", true);
       response.setAttr("addSelectedCustomerInvoiceLinesBtn", "hidden", true);
       response.setAttr("unlinkSelectedCustomerInvoiceLinesBtn", "hidden", true);
@@ -105,7 +101,7 @@ public class InvoiceLineProjectController {
 
     try {
       Project project = request.getContext().asType(Project.class);
-      project = projectRepository.find(project.getId());
+      project = Beans.get(ProjectRepository.class).find(project.getId());
 
       setSupplierInvoiceLineProject(request, response, project);
 
@@ -124,11 +120,10 @@ public class InvoiceLineProjectController {
       response.setFlash(IExceptionMessage.LINES_NOT_SELECTED);
     } else {
       List<Long> lineIds =
-          supplierInvoiceLineSet
-              .stream()
+          supplierInvoiceLineSet.stream()
               .map(it -> Long.parseLong(it.get("id").toString()))
               .collect(Collectors.toList());
-      invoiceLineProjectService.setProject(lineIds, project);
+      Beans.get(InvoiceLineProjectService.class).setProject(lineIds, project);
       response.setAttr("$supplierInvoiceLineSet", "hidden", true);
       response.setAttr("addSelectedSupplierInvoiceLinesBtn", "hidden", true);
       response.setAttr("unlinkSelectedSupplierInvoiceLinesBtn", "hidden", true);
@@ -152,6 +147,21 @@ public class InvoiceLineProjectController {
       setSupplierInvoiceLineProject(request, response, null);
     } catch (Exception e) {
       TraceBackService.trace(e);
+    }
+  }
+
+  public void setProjectToAnalyticDistribution(ActionRequest request, ActionResponse response) {
+    try {
+      InvoiceLine invoiceLine = request.getContext().asType(InvoiceLine.class);
+      List<AnalyticMoveLine> analyticMoveLines = invoiceLine.getAnalyticMoveLineList();
+      if (analyticMoveLines != null) {
+        response.setValue(
+            "analyticMoveLineList",
+            Beans.get(InvoiceLineProjectService.class)
+                .setProjectToAnalyticDistribution(invoiceLine, analyticMoveLines));
+      }
+    } catch (Exception e) {
+      TraceBackService.trace(response, e);
     }
   }
 }

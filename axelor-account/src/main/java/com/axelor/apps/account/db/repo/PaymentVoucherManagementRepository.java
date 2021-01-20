@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -33,15 +33,13 @@ public class PaymentVoucherManagementRepository extends PaymentVoucherRepository
 
     copy.setStatusSelect(STATUS_DRAFT);
     copy.setRef(null);
-    copy.setPaymentDate(Beans.get(AppBaseService.class).getTodayDate());
+    copy.setPaymentDate(Beans.get(AppBaseService.class).getTodayDate(copy.getCompany()));
     copy.clearPayVoucherDueElementList();
     copy.clearPayVoucherElementToPayList();
     copy.setGeneratedMove(null);
     copy.setBankCardTransactionNumber(null);
     copy.clearBatchSet();
     copy.setImportId(null);
-    copy.setPayboxAmountPaid(null);
-    copy.setPayboxPaidOk(false);
     copy.setReceiptNo(null);
     copy.setRemainingAmount(null);
     copy.setRemainingAllocatedAmount(null);

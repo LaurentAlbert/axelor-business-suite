@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -40,8 +40,7 @@ public class PartnerStockSettingsServiceImpl implements PartnerStockSettingsServ
       return createMailSettings(partner, company);
     }
     Optional<PartnerStockSettings> partnerStockSettings =
-        mailSettingsList
-            .stream()
+        mailSettingsList.stream()
             .filter(stockSettings -> company.equals(stockSettings.getCompany()))
             .findAny();
     return partnerStockSettings.isPresent()
@@ -50,7 +49,7 @@ public class PartnerStockSettingsServiceImpl implements PartnerStockSettingsServ
   }
 
   @Override
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public PartnerStockSettings createMailSettings(Partner partner, Company company)
       throws AxelorException {
     PartnerStockSettings mailSettings = new PartnerStockSettings();
@@ -80,6 +79,23 @@ public class PartnerStockSettingsServiceImpl implements PartnerStockSettingsServ
       }
     }
 
+    return null;
+  }
+
+  @Override
+  public StockLocation getDefaultExternalStockLocation(Partner partner, Company company) {
+
+    if (partner != null && company != null) {
+      PartnerStockSettings partnerStockSettings =
+          Beans.get(PartnerStockSettingsRepository.class)
+              .all()
+              .filter("self.partner = ? AND self.company = ?", partner, company)
+              .fetchOne();
+
+      if (partnerStockSettings != null) {
+        return partnerStockSettings.getDefaultExternalStockLocation();
+      }
+    }
     return null;
   }
 }

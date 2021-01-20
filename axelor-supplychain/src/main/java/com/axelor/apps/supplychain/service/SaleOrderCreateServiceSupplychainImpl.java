@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -22,7 +22,9 @@ import com.axelor.apps.base.db.Company;
 import com.axelor.apps.base.db.Currency;
 import com.axelor.apps.base.db.Partner;
 import com.axelor.apps.base.db.PriceList;
+import com.axelor.apps.base.db.TradingName;
 import com.axelor.apps.base.service.PartnerService;
+import com.axelor.apps.base.service.app.AppBaseService;
 import com.axelor.apps.sale.db.SaleOrder;
 import com.axelor.apps.sale.db.repo.SaleOrderRepository;
 import com.axelor.apps.sale.service.app.AppSaleService;
@@ -50,12 +52,14 @@ public class SaleOrderCreateServiceSupplychainImpl extends SaleOrderCreateServic
 
   protected AccountConfigService accountConfigService;
   protected SaleOrderRepository saleOrderRepository;
+  protected AppBaseService appBaseService;
 
   @Inject
   public SaleOrderCreateServiceSupplychainImpl(
       PartnerService partnerService,
       SaleOrderRepository saleOrderRepo,
       AppSaleService appSaleService,
+      AppBaseService appBaseService,
       SaleOrderService saleOrderService,
       SaleOrderComputeService saleOrderComputeService,
       AccountConfigService accountConfigService,
@@ -65,11 +69,12 @@ public class SaleOrderCreateServiceSupplychainImpl extends SaleOrderCreateServic
 
     this.accountConfigService = accountConfigService;
     this.saleOrderRepository = saleOrderRepository;
+    this.appBaseService = appBaseService;
   }
 
   @Override
   public SaleOrder createSaleOrder(
-      User salemanUser,
+      User salespersonUser,
       Company company,
       Partner contactPartner,
       Currency currency,
@@ -79,10 +84,27 @@ public class SaleOrderCreateServiceSupplychainImpl extends SaleOrderCreateServic
       LocalDate orderDate,
       PriceList priceList,
       Partner clientPartner,
-      Team team)
+      Team team,
+      TradingName tradingName)
       throws AxelorException {
+
+    if (!Beans.get(AppSaleService.class).isApp("supplychain")) {
+      return super.createSaleOrder(
+          salespersonUser,
+          company,
+          contactPartner,
+          currency,
+          deliveryDate,
+          internalReference,
+          externalReference,
+          orderDate,
+          priceList,
+          clientPartner,
+          team,
+          tradingName);
+    }
     return createSaleOrder(
-        salemanUser,
+        salespersonUser,
         company,
         contactPartner,
         currency,
@@ -93,11 +115,12 @@ public class SaleOrderCreateServiceSupplychainImpl extends SaleOrderCreateServic
         orderDate,
         priceList,
         clientPartner,
-        team);
+        team,
+        tradingName);
   }
 
   public SaleOrder createSaleOrder(
-      User salemanUser,
+      User salespersonUser,
       Company company,
       Partner contactPartner,
       Currency currency,
@@ -108,7 +131,8 @@ public class SaleOrderCreateServiceSupplychainImpl extends SaleOrderCreateServic
       LocalDate orderDate,
       PriceList priceList,
       Partner clientPartner,
-      Team team)
+      Team team,
+      TradingName tradingName)
       throws AxelorException {
 
     logger.debug(
@@ -119,7 +143,7 @@ public class SaleOrderCreateServiceSupplychainImpl extends SaleOrderCreateServic
 
     SaleOrder saleOrder =
         super.createSaleOrder(
-            salemanUser,
+            salespersonUser,
             company,
             contactPartner,
             currency,
@@ -129,7 +153,8 @@ public class SaleOrderCreateServiceSupplychainImpl extends SaleOrderCreateServic
             orderDate,
             priceList,
             clientPartner,
-            team);
+            team,
+            tradingName);
 
     if (stockLocation == null) {
       stockLocation = Beans.get(StockLocationService.class).getPickupDefaultStockLocation(company);
@@ -156,7 +181,7 @@ public class SaleOrderCreateServiceSupplychainImpl extends SaleOrderCreateServic
     return saleOrder;
   }
 
-  @Transactional
+  @Transactional(rollbackOn = {Exception.class})
   public SaleOrder mergeSaleOrders(
       List<SaleOrder> saleOrderList,
       Currency currency,
@@ -193,10 +218,11 @@ public class SaleOrderCreateServiceSupplychainImpl extends SaleOrderCreateServic
             numSeq,
             externalRef,
             stockLocation,
-            LocalDate.now(),
+            appBaseService.getTodayDate(company),
             priceList,
             clientPartner,
-            team);
+            team,
+            null);
 
     super.attachToNewSaleOrder(saleOrderList, saleOrderMerged);
 

@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -53,9 +53,11 @@ import com.axelor.apps.base.db.repo.SequenceRepository;
 import com.axelor.apps.base.service.administration.SequenceService;
 import com.axelor.apps.base.service.app.AppBaseService;
 import com.axelor.apps.base.service.tax.TaxService;
+import com.axelor.auth.AuthUtils;
+import com.axelor.auth.db.User;
 import com.axelor.db.JPA;
 import com.axelor.exception.AxelorException;
-import com.axelor.exception.db.IException;
+import com.axelor.exception.db.repo.ExceptionOriginRepository;
 import com.axelor.exception.db.repo.TraceBackRepository;
 import com.axelor.exception.service.TraceBackService;
 import com.axelor.i18n.I18n;
@@ -67,6 +69,7 @@ import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import javax.persistence.EntityTransaction;
 import org.slf4j.Logger;
@@ -139,7 +142,7 @@ public class IrrecoverableService {
    * @param irrecoverable Un objet Irrécouvrable
    * @throws AxelorException
    */
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public void getIrrecoverable(Irrecoverable irrecoverable) throws AxelorException {
 
     Company company = irrecoverable.getCompany();
@@ -239,8 +242,7 @@ public class IrrecoverableService {
   /**
    * Fonction permettant de récupérer les factures à passer en irrécouvrable d'un tiers
    *
-   * @param company Une société
-   * @param payerPartner Un tiers payeur
+   * @param partner Un tiers
    * @param allInvoiceList La liste des factures à passer en irrécouvrable de la société
    * @return
    */
@@ -261,7 +263,6 @@ public class IrrecoverableService {
   /**
    * Fonction permettant de récupérer les échéances rejetées à passer en irrécouvrable d'un tiers
    *
-   * @param company Une société
    * @param payerPartner Un tiers payeur
    * @param allPaymentScheduleLineList La liste des échéances rejetées à passer en irrécouvrable de
    *     la société
@@ -345,11 +346,11 @@ public class IrrecoverableService {
    * @param irrecoverable Un objet Irrécouvrable
    * @param payerPartner Un tiers payeur
    * @param invoiceList Une liste de facture du tiers payeur
-   * @param paymentScheduleLineSet Une liste d'échéancier du tiers payeur
+   * @param paymentScheduleLineList Une liste d'échéancier du tiers payeur
    * @return
    * @throws AxelorException
    */
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public IrrecoverableCustomerLine createIrrecoverableCustomerLine(
       Irrecoverable irrecoverable,
       Partner payerPartner,
@@ -412,7 +413,7 @@ public class IrrecoverableService {
           TraceBackService.trace(
               new AxelorException(
                   e, e.getCategory(), I18n.get("Invoice") + " %s", invoice.getInvoiceId()),
-              IException.IRRECOVERABLE,
+              ExceptionOriginRepository.IRRECOVERABLE,
               irrecoverable.getId());
           log.error("Bug(Anomalie) généré(e) pour la facture : {}", invoice.getInvoiceId());
 
@@ -420,7 +421,7 @@ public class IrrecoverableService {
           anomaly++;
           TraceBackService.trace(
               new Exception(String.format(I18n.get("Invoice") + " %s", invoice.getInvoiceId()), e),
-              IException.IRRECOVERABLE,
+              ExceptionOriginRepository.IRRECOVERABLE,
               irrecoverable.getId());
           log.error("Bug(Anomalie) généré(e) pour la facture : {}", invoice.getInvoiceId());
 
@@ -460,7 +461,7 @@ public class IrrecoverableService {
                   e.getCategory(),
                   I18n.get(IExceptionMessage.IRRECOVERABLE_1),
                   paymentScheduleLine.getName()),
-              IException.IRRECOVERABLE,
+              ExceptionOriginRepository.IRRECOVERABLE,
               irrecoverable.getId());
           log.error(
               "Bug(Anomalie) généré(e) pour la ligne d'échéancier : {}",
@@ -473,7 +474,7 @@ public class IrrecoverableService {
                   String.format(
                       I18n.get(IExceptionMessage.IRRECOVERABLE_1), paymentScheduleLine.getName()),
                   e),
-              IException.IRRECOVERABLE,
+              ExceptionOriginRepository.IRRECOVERABLE,
               irrecoverable.getId());
           log.error(
               "Bug(Anomalie) généré(e) pour la ligne d'échéancier : {}",
@@ -496,7 +497,7 @@ public class IrrecoverableService {
     return anomaly;
   }
 
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public void createMoveForPaymentScheduleLineReject(
       Irrecoverable irrecoverable, PaymentScheduleLine paymentScheduleLine) throws AxelorException {
 
@@ -514,7 +515,7 @@ public class IrrecoverableService {
     irrecoverable.getMoveSet().add(move);
   }
 
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public void createIrrecoverableInvoiceLineMove(Irrecoverable irrecoverable, Invoice invoice)
       throws AxelorException {
 
@@ -717,7 +718,15 @@ public class IrrecoverableService {
       throws AxelorException {
     List<IrrecoverableReportLine> irlList = new ArrayList<IrrecoverableReportLine>();
 
-    BigDecimal taxRate = taxService.getTaxRate(tax, appAccountService.getTodayDate());
+    BigDecimal taxRate =
+        taxService.getTaxRate(
+            tax,
+            appAccountService.getTodayDate(
+                paymentScheduleLine.getPaymentSchedule() != null
+                    ? paymentScheduleLine.getPaymentSchedule().getCompany()
+                    : Optional.ofNullable(AuthUtils.getUser())
+                        .map(User::getActiveCompany)
+                        .orElse(null)));
 
     BigDecimal amount = paymentScheduleLine.getInTaxAmount();
 
@@ -863,7 +872,7 @@ public class IrrecoverableService {
                   invoiceLineTax.getTaxLine().getTax(), company, false, false),
               amount,
               true,
-              appAccountService.getTodayDate(),
+              appAccountService.getTodayDate(company),
               seq,
               irrecoverableName,
               invoice.getInvoiceId());
@@ -881,7 +890,7 @@ public class IrrecoverableService {
             accountConfig.getIrrecoverableAccount(),
             debitAmount,
             true,
-            appAccountService.getTodayDate(),
+            appAccountService.getTodayDate(company),
             seq,
             irrecoverableName,
             invoice.getInvoiceId());
@@ -910,7 +919,7 @@ public class IrrecoverableService {
             customerMoveLine.getAccount(),
             creditAmount,
             false,
-            appAccountService.getTodayDate(),
+            appAccountService.getTodayDate(company),
             seq,
             irrecoverableName,
             invoice.getInvoiceId());
@@ -963,7 +972,7 @@ public class IrrecoverableService {
             moveLine.getAccount(),
             amount,
             false,
-            appAccountService.getTodayDate(),
+            appAccountService.getTodayDate(company),
             seq,
             irrecoverableName,
             moveLine.getDescription());
@@ -976,7 +985,7 @@ public class IrrecoverableService {
 
     Tax tax = accountConfig.getIrrecoverableStandardRateTax();
 
-    BigDecimal taxRate = taxService.getTaxRate(tax, appAccountService.getTodayDate());
+    BigDecimal taxRate = taxService.getTaxRate(tax, appAccountService.getTodayDate(company));
 
     // Debit MoveLine 654. (irrecoverable account)
     BigDecimal divid = taxRate.add(BigDecimal.ONE);
@@ -991,7 +1000,7 @@ public class IrrecoverableService {
             accountConfig.getIrrecoverableAccount(),
             irrecoverableAmount,
             true,
-            appAccountService.getTodayDate(),
+            appAccountService.getTodayDate(company),
             2,
             irrecoverableName,
             moveLine.getDescription());
@@ -1007,7 +1016,7 @@ public class IrrecoverableService {
             taxAccount,
             taxAmount,
             true,
-            appAccountService.getTodayDate(),
+            appAccountService.getTodayDate(company),
             3,
             irrecoverableName,
             moveLine.getDescription());
@@ -1074,7 +1083,7 @@ public class IrrecoverableService {
    * @param generateEvent Un évènement à t'il déjà été créé par un autre objet ?
    * @throws AxelorException
    */
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public void passInIrrecoverable(Invoice invoice, boolean generateEvent) throws AxelorException {
     invoice.setIrrecoverableStatusSelect(
         InvoiceRepository.IRRECOVERABLE_STATUS_TO_PASS_IN_IRRECOUVRABLE);
@@ -1138,7 +1147,7 @@ public class IrrecoverableService {
    * @param invoice Une facture
    * @throws AxelorException
    */
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public void notPassInIrrecoverable(Invoice invoice) throws AxelorException {
     invoice.setIrrecoverableStatusSelect(InvoiceRepository.IRRECOVERABLE_STATUS_NOT_IRRECOUVRABLE);
 
@@ -1159,7 +1168,7 @@ public class IrrecoverableService {
    * @param passInvoice La procédure doit-elle passer aussi en irrécouvrable la facture ?
    * @throws AxelorException
    */
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public void passInIrrecoverable(MoveLine moveLine, boolean generateEvent, boolean passInvoice)
       throws AxelorException {
     moveLine.setIrrecoverableStatusSelect(
@@ -1209,7 +1218,7 @@ public class IrrecoverableService {
    * @param passInvoice La procédure doit-elle passer aussi en irrécouvrable la facture ?
    * @throws AxelorException
    */
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public void notPassInIrrecoverable(MoveLine moveLine, boolean passInvoice)
       throws AxelorException {
     moveLine.setIrrecoverableStatusSelect(
@@ -1230,7 +1239,7 @@ public class IrrecoverableService {
    * @param paymentSchedule Un échéancier de paiement
    * @throws AxelorException
    */
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public void passInIrrecoverable(PaymentSchedule paymentSchedule) throws AxelorException {
     Company company = paymentSchedule.getCompany();
 
@@ -1278,7 +1287,7 @@ public class IrrecoverableService {
    * @param paymentSchedule Un échéancier de paiement
    * @throws AxelorException
    */
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public void notPassInIrrecoverable(PaymentSchedule paymentSchedule) throws AxelorException {
     paymentSchedule.setIrrecoverableStatusSelect(
         PaymentScheduleRepository.IRRECOVERABLE_STATUS_NOT_IRRECOUVRABLE);

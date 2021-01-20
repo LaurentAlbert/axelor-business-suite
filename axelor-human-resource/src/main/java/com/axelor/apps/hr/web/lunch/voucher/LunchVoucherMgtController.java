@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -19,6 +19,7 @@ package com.axelor.apps.hr.web.lunch.voucher;
 
 import com.axelor.apps.ReportFactory;
 import com.axelor.apps.base.service.PeriodService;
+import com.axelor.apps.base.service.app.AppBaseService;
 import com.axelor.apps.base.service.user.UserService;
 import com.axelor.apps.hr.db.LunchVoucherMgt;
 import com.axelor.apps.hr.db.LunchVoucherMgtLine;
@@ -32,18 +33,13 @@ import com.axelor.inject.Beans;
 import com.axelor.meta.schema.actions.ActionView;
 import com.axelor.rpc.ActionRequest;
 import com.axelor.rpc.ActionResponse;
-import com.google.inject.Inject;
-import com.google.inject.Provider;
 import com.google.inject.Singleton;
 import java.io.IOException;
-import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 @Singleton
 public class LunchVoucherMgtController {
-
-  @Inject private Provider<LunchVoucherMgtService> lunchVoucherMgtProvider;
 
   public void calculate(ActionRequest request, ActionResponse response) {
 
@@ -51,7 +47,7 @@ public class LunchVoucherMgtController {
       LunchVoucherMgt lunchVoucherMgt =
           Beans.get(LunchVoucherMgtRepository.class)
               .find(request.getContext().asType(LunchVoucherMgt.class).getId());
-      lunchVoucherMgtProvider.get().calculate(lunchVoucherMgt);
+      Beans.get(LunchVoucherMgtService.class).calculate(lunchVoucherMgt);
 
       response.setReload(true);
     } catch (Exception e) {
@@ -64,7 +60,7 @@ public class LunchVoucherMgtController {
         Beans.get(LunchVoucherMgtRepository.class)
             .find(request.getContext().asType(LunchVoucherMgt.class).getId());
     try {
-      lunchVoucherMgtProvider.get().validate(lunchVoucherMgt);
+      Beans.get(LunchVoucherMgtService.class).validate(lunchVoucherMgt);
 
       response.setReload(true);
 
@@ -82,9 +78,8 @@ public class LunchVoucherMgtController {
   }
 
   public void updateTotal(ActionRequest request, ActionResponse response) {
-    LunchVoucherMgtService lunchVoucherMgtService = lunchVoucherMgtProvider.get();
     LunchVoucherMgt lunchVoucherMgt = request.getContext().asType(LunchVoucherMgt.class);
-    lunchVoucherMgtService.calculateTotal(lunchVoucherMgt);
+    Beans.get(LunchVoucherMgtService.class).calculateTotal(lunchVoucherMgt);
 
     response.setValue("totalLunchVouchers", lunchVoucherMgt.getTotalLunchVouchers());
     response.setValue("requestedLunchVouchers", lunchVoucherMgt.getRequestedLunchVouchers());
@@ -97,7 +92,7 @@ public class LunchVoucherMgtController {
             .find(request.getContext().asType(LunchVoucherMgt.class).getId());
 
     try {
-      lunchVoucherMgtProvider.get().export(lunchVoucherMgt);
+      Beans.get(LunchVoucherMgtService.class).export(lunchVoucherMgt);
       response.setReload(true);
     } catch (Exception e) {
       TraceBackService.trace(response, e);
@@ -110,12 +105,19 @@ public class LunchVoucherMgtController {
     String name =
         lunchVoucherMgt.getCompany().getName()
             + " - "
-            + LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
+            + Beans.get(AppBaseService.class)
+                .getTodayDate(lunchVoucherMgt.getCompany())
+                .format(DateTimeFormatter.BASIC_ISO_DATE);
 
     try {
       String fileLink =
           ReportFactory.createReport(IReport.LUNCH_VOUCHER_MGT_MONTHLY, name)
               .addParam("lunchVoucherMgtId", lunchVoucherMgt.getId())
+              .addParam(
+                  "Timezone",
+                  lunchVoucherMgt.getCompany() != null
+                      ? lunchVoucherMgt.getCompany().getTimezone()
+                      : null)
               .addParam("Locale", Beans.get(UserService.class).getLanguage())
               .addFormat(ReportSettings.FORMAT_PDF)
               .generate()
@@ -130,7 +132,6 @@ public class LunchVoucherMgtController {
 
   public void updateStock(ActionRequest request, ActionResponse response) {
     try {
-      LunchVoucherMgtService lunchVoucherMgtService = lunchVoucherMgtProvider.get();
       LunchVoucherMgt lunchVoucherMgt = request.getContext().asType(LunchVoucherMgt.class);
       if (lunchVoucherMgt.getId() == null) {
         return;
@@ -141,10 +142,11 @@ public class LunchVoucherMgtController {
               .filter("self.lunchVoucherMgt.id = ?", lunchVoucherMgt.getId())
               .fetch();
       int stockQuantityStatus =
-          lunchVoucherMgtService.updateStock(
-              lunchVoucherMgt.getLunchVoucherMgtLineList(),
-              oldLunchVoucherLines,
-              lunchVoucherMgt.getCompany());
+          Beans.get(LunchVoucherMgtService.class)
+              .updateStock(
+                  lunchVoucherMgt.getLunchVoucherMgtLineList(),
+                  oldLunchVoucherLines,
+                  lunchVoucherMgt.getCompany());
       response.setValue("stockQuantityStatus", stockQuantityStatus);
     } catch (Exception e) {
       TraceBackService.trace(response, e);

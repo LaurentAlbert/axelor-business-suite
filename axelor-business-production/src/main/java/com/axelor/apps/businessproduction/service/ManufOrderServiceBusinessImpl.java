@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -19,8 +19,10 @@ package com.axelor.apps.businessproduction.service;
 
 import com.axelor.apps.base.db.Company;
 import com.axelor.apps.base.db.Product;
+import com.axelor.apps.base.service.ProductCompanyService;
 import com.axelor.apps.base.service.ProductVariantService;
 import com.axelor.apps.base.service.administration.SequenceService;
+import com.axelor.apps.base.service.app.AppBaseService;
 import com.axelor.apps.production.db.BillOfMaterial;
 import com.axelor.apps.production.db.ManufOrder;
 import com.axelor.apps.production.db.OperationOrder;
@@ -31,6 +33,7 @@ import com.axelor.apps.production.service.manuforder.ManufOrderServiceImpl;
 import com.axelor.apps.production.service.manuforder.ManufOrderWorkflowService;
 import com.axelor.apps.production.service.operationorder.OperationOrderService;
 import com.axelor.exception.AxelorException;
+import com.axelor.inject.Beans;
 import com.google.inject.Inject;
 import com.google.inject.persist.Transactional;
 import java.lang.invoke.MethodHandles;
@@ -51,22 +54,26 @@ public class ManufOrderServiceBusinessImpl extends ManufOrderServiceImpl {
       OperationOrderService operationOrderService,
       ManufOrderWorkflowService manufOrderWorkflowService,
       ProductVariantService productVariantService,
+      AppBaseService appBaseService,
       AppProductionService appProductionService,
       ManufOrderRepository manufOrderRepo,
       ProdProductRepository prodProductRepo,
-      OperationOrderServiceBusinessImpl operationOrderServiceBusinessImpl) {
+      OperationOrderServiceBusinessImpl operationOrderServiceBusinessImpl,
+      ProductCompanyService productCompanyService) {
     super(
         sequenceService,
         operationOrderService,
         manufOrderWorkflowService,
         productVariantService,
+        appBaseService,
         appProductionService,
         manufOrderRepo,
-        prodProductRepo);
+        prodProductRepo,
+        productCompanyService);
     this.operationOrderServiceBusinessImpl = operationOrderServiceBusinessImpl;
   }
 
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional
   public void propagateIsToInvoice(ManufOrder manufOrder) {
 
     logger.debug(
@@ -92,13 +99,26 @@ public class ManufOrderServiceBusinessImpl extends ManufOrderServiceImpl {
       boolean isToInvoice,
       Company company,
       BillOfMaterial billOfMaterial,
-      LocalDateTime plannedStartDateT)
+      LocalDateTime plannedStartDateT,
+      LocalDateTime plannedEndDateT)
       throws AxelorException {
 
     ManufOrder manufOrder =
         super.createManufOrder(
-            product, qty, priority, isToInvoice, company, billOfMaterial, plannedStartDateT);
+            product,
+            qty,
+            priority,
+            isToInvoice,
+            company,
+            billOfMaterial,
+            plannedStartDateT,
+            plannedEndDateT);
 
+    AppProductionService appProductionService = Beans.get(AppProductionService.class);
+    if (!appProductionService.isApp("production")
+        || !appProductionService.getAppProduction().getManageBusinessProduction()) {
+      return manufOrder;
+    }
     manufOrder.setIsToInvoice(isToInvoice);
 
     return manufOrder;

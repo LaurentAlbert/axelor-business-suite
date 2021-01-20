@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -35,6 +35,8 @@ public interface IExceptionMessage {
   static final String SO_INVOICE_6 = /*$$(*/ "Please, select a currency for the order %s" /*)*/;
 
   static final String SO_INVOICE_NO_LINES_SELECTED = /*$$(*/ "There are no lines to invoice" /*)*/;
+  static final String SO_INVOICE_NO_TIMETABLES_SELECTED = /*$$(*/
+      "There are no selected timetables to invoice" /*)*/;
   static final String SO_INVOICE_QTY_MAX = /*$$(*/
       "The quantity to invoice is greater than the quantity in the sale order" /*)*/;
   static final String SO_INVOICE_AMOUNT_MAX = /*$$(*/
@@ -116,13 +118,12 @@ public interface IExceptionMessage {
   static final String MRP_LINE_1 = /*$$(*/
       "No default supplier is defined for the product %s" /*)*/;
 
-  static final String MRP_MISSING_MRP_LINE_TYPE = /*$$(*/
-      "No move type found for element : %s" /*)*/;
-
   static final String MRP_MISSING_STOCK_LOCATION_VALID = /*$$(*/
       "No stock location valid. Please uncheck the chosen stock location 'is not in MRP'." /*)*/;
 
   static final String MRP_NO_PRODUCT = /*$$(*/ "Please select an element to run calculation" /*)*/;
+
+  static final String MRP_NO_PRODUCT_UNIT = /*$$(*/ "Please fill unit for product %s" /*)*/;
 
   /** Sale order Stock Service Implement */
   static final String SO_NO_DELIVERY_STOCK_MOVE_TO_GENERATE = /*$$(*/
@@ -149,8 +150,6 @@ public interface IExceptionMessage {
   static final String TIMETABLE_INVOICE_ALREADY_GENERATED = /*$$(*/
       "The invoice has already been generated." /*)*/;
 
-  static final String TIMETABLE_MISSING_PRODUCT_NAME = /*$$(*/
-      "Please fill the product name." /*)*/;
   static final String TIMETABLE_SALE_ORDER_NOT_CONFIRMED = /*$$(*/
       "Please confirm the sale order before invoicing." /*)*/;
 
@@ -185,6 +184,9 @@ public interface IExceptionMessage {
 
   static final String SALE_ORDER_LINE_NO_STOCK_MOVE = /*$$(*/
       "Please generate a stock move for this sale order before modifying allocated quantity." /*)*/;
+
+  static final String SALE_ORDER_LINE_REQUEST_QTY_NEGATIVE = /*$$(*/
+      "You cannot request reservation with a negative quantity." /*)*/;
 
   static final String SALE_ORDER_LINE_RESERVATION_QTY_NEGATIVE = /*$$(*/
       "Please do not enter negative quantity for reservation." /*)*/;
@@ -224,6 +226,9 @@ public interface IExceptionMessage {
   public static final String SALE_ORDER_STOCK_MOVE_CREATED = /*$$(*/
       "Stock move %s has been created for this sale order" /*)*/;
 
+  static final String SUPPLYCHAIN_MRP_SEQUENCE_ERROR = /*$$(*/
+      "The company %s doesn't have any configured sequence for MRP" /*)*/;
+
   static final String STOCK_MOVE_VERIFY_PRODUCT_STOCK_ERROR = /*$$(*/
       "Product stock for %s is not enough for availability request" /*)*/;
 
@@ -232,4 +237,36 @@ public interface IExceptionMessage {
 
   static final String PURCHASE_ORDER_ANALYTIC_DISTRIBUTION_ERROR = /*$$(*/
       "There is no analytic distribution on %s purchase order line" /*)*/;
+
+  static final String STOCK_MOVE_INVOICE_ERROR = /*$$(*/
+      "Stock move has already been totally invoiced." /*)*/;
+
+  static final String STOCK_MOVE_INVOICE_QTY_INVONVERTIBLE_UNIT = /*$$(*/
+      "The invoice's unit is different and inconvertible into the stock move's unit." /*)*/;
+
+  static final String STOCK_MOVE_PARTIAL_INVOICE_ERROR = /*$$(*/
+      "Stock move %s has already been invoiced." /*)*/;
+
+  static final String STOCK_MOVE_INVOICE_QTY_MAX = /*$$(*/
+      "The quantity to invoice is greater than the quantity in the stock move" /*)*/;
+
+  static final String SALE_ORDER_COMPLETE_MANUALLY = /*$$(*/
+      "There is at least one draft or planned stock move for this sale order." /*)*/;
+
+  public static final String ALLOCATED_STOCK_MOVE_LINE_DELETED_ERROR = /*$$(*/
+      "It is not possible to delete a stock move line with allocated or reserved quantity." /*)*/;
+
+  String BLOCK_SPLIT_OUTGOING_STOCK_MOVE_LINES = /*$$(*/
+      "Partial invoicing of outgoing stock move with tracking number activated is not supported." /*)*/;
+
+  String STOCK_MOVE_NO_LINES_TO_INVOICE = /*$$(*/ "Please fill a quantity to invoice." /*)*/;
+
+  public static final String TIMETABLE_PURCHASE_OREDR_NOT_VALIDATED = /*$$(*/
+      "Please validate the purchase order before invoicing." /*)*/;
+
+  static final String PO_INVOICE_QTY_MAX = /*$$(*/
+      "The quantity to invoice is greater than the quantity in the purchase order" /*)*/;
+
+  static final String SALE_ORDER_CLIENT_PARTNER_EXCEEDED_CREDIT = /*$$(*/
+      "%s blocked : maximal accepted credit exceeded for %s." /*)*/;
 }

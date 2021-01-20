@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -19,13 +19,14 @@ package com.axelor.apps.base.service.app;
 
 import com.axelor.app.AppSettings;
 import com.axelor.apps.base.db.AppBase;
+import com.axelor.apps.base.db.Company;
 import com.axelor.apps.base.db.CurrencyConversionLine;
 import com.axelor.apps.base.db.Language;
 import com.axelor.apps.base.db.Unit;
+import com.axelor.apps.tool.date.DateTool;
 import com.axelor.auth.AuthUtils;
 import com.axelor.auth.db.User;
 import com.axelor.db.Query;
-import com.axelor.exception.AxelorException;
 import com.google.common.base.Strings;
 import com.google.inject.persist.Transactional;
 import java.math.BigDecimal;
@@ -45,14 +46,17 @@ public class AppBaseServiceImpl extends AppServiceImpl implements AppBaseService
     return Query.of(AppBase.class).cacheable().fetchOne();
   }
 
-  /**
-   * Get the today date time Get the value defined in User if not null, Else get the valued defined
-   * in Base app Else get the server current date time
-   */
   @Override
   public ZonedDateTime getTodayDateTime() {
+    return getTodayDateTime(null);
+  }
+
+  public ZonedDateTime getTodayDateTime(Company company) {
 
     ZonedDateTime todayDateTime = ZonedDateTime.now();
+    if (company != null) {
+      todayDateTime = DateTool.getTodayDateTime(company.getTimezone());
+    }
 
     String applicationMode = AppSettings.get().get("application.mode", "prod");
 
@@ -71,14 +75,16 @@ public class AppBaseServiceImpl extends AppServiceImpl implements AppBaseService
     return todayDateTime;
   }
 
-  /**
-   * Get the today date Get the value defined in User if not null, Else get the valued defined in
-   * Base app Else get the server current date
-   */
   @Override
   public LocalDate getTodayDate() {
 
     return getTodayDateTime().toLocalDate();
+  }
+
+  @Override
+  public LocalDate getTodayDate(Company company) {
+
+    return getTodayDateTime(company).toLocalDate();
   }
 
   @Override
@@ -100,6 +106,27 @@ public class AppBaseServiceImpl extends AppServiceImpl implements AppBaseService
 
     if (appBase != null) {
       return appBase.getNbDecimalDigitForUnitPrice();
+    }
+
+    return DEFAULT_NB_DECIMAL_DIGITS;
+  }
+
+  @Override
+  public int getGlobalTrackingLogPersistence() {
+    AppBase appBase = getAppBase();
+    if (appBase != null) {
+      return appBase.getGlobalTrackingLogPersistence();
+    }
+    return DEFAULT_TRACKING_MONTHS_PERSISTENCE;
+  }
+
+  @Override
+  public int getNbDecimalDigitForQty() {
+
+    AppBase appBase = getAppBase();
+
+    if (appBase != null) {
+      return appBase.getNbDecimalDigitForQty();
     }
 
     return DEFAULT_NB_DECIMAL_DIGITS;
@@ -186,7 +213,7 @@ public class AppBaseServiceImpl extends AppServiceImpl implements AppBaseService
 
   /** {@inheritDoc} */
   @Override
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional
   public void setManageMultiBanks(boolean manageMultiBanks) {
     getAppBase().setManageMultiBanks(manageMultiBanks);
   }

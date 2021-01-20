@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -19,22 +19,23 @@ package com.axelor.apps.account.web;
 
 import com.axelor.apps.account.db.Account;
 import com.axelor.apps.account.db.repo.AccountRepository;
+import com.axelor.apps.account.exception.IExceptionMessage;
 import com.axelor.apps.account.service.AccountService;
 import com.axelor.apps.account.translation.ITranslation;
+import com.axelor.common.ObjectUtils;
+import com.axelor.exception.AxelorException;
+import com.axelor.exception.db.repo.TraceBackRepository;
 import com.axelor.exception.service.TraceBackService;
 import com.axelor.i18n.I18n;
+import com.axelor.inject.Beans;
 import com.axelor.rpc.ActionRequest;
 import com.axelor.rpc.ActionResponse;
-import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import java.math.BigDecimal;
+import java.util.List;
 
 @Singleton
 public class AccountController {
-
-  @Inject private AccountRepository accountRepository;
-
-  @Inject private AccountService accountService;
 
   public void computeBalance(ActionRequest request, ActionResponse response) {
     try {
@@ -42,10 +43,11 @@ public class AccountController {
       if (account.getId() == null) {
         return;
       }
-      account = accountRepository.find(account.getId());
+      account = Beans.get(AccountRepository.class).find(account.getId());
 
       BigDecimal balance =
-          accountService.computeBalance(account, AccountService.BALANCE_TYPE_DEBIT_BALANCE);
+          Beans.get(AccountService.class)
+              .computeBalance(account, AccountService.BALANCE_TYPE_DEBIT_BALANCE);
 
       if (balance.compareTo(BigDecimal.ZERO) >= 0) {
         response.setAttr("$balanceBtn", "title", I18n.get(ITranslation.ACCOUNT_DEBIT_BALANCE));
@@ -55,6 +57,37 @@ public class AccountController {
       }
 
       response.setValue("$balanceBtn", balance);
+    } catch (Exception e) {
+      TraceBackService.trace(response, e);
+    }
+  }
+
+  public void checkIfCodeAccountAlreadyExistForCompany(
+      ActionRequest request, ActionResponse response) {
+    try {
+      Account account = request.getContext().asType(Account.class);
+      Long accountId = account.getId();
+      if (accountId == null) {
+        accountId = 0L;
+      }
+      List<Account> sameAccountList =
+          Beans.get(AccountRepository.class)
+              .all()
+              .filter(
+                  "self.company = ?1 AND self.code = ?2 AND self.id != ?3",
+                  account.getCompany(),
+                  account.getCode(),
+                  accountId)
+              .fetch();
+      if (!ObjectUtils.isEmpty(sameAccountList)) {
+
+        throw new AxelorException(
+            TraceBackRepository.CATEGORY_CONFIGURATION_ERROR,
+            I18n.get(IExceptionMessage.ACCOUNT_CODE_ALREADY_IN_USE_FOR_COMPANY),
+            account.getCode(),
+            account.getCompany().getName());
+      }
+
     } catch (Exception e) {
       TraceBackService.trace(response, e);
     }

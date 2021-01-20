@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -17,11 +17,14 @@
  */
 package com.axelor.studio.service.wkf;
 
+import com.axelor.common.Inflector;
 import com.axelor.db.EntityHelper;
 import com.axelor.db.Model;
+import com.axelor.inject.Beans;
+import com.axelor.meta.CallMethod;
 import com.axelor.meta.MetaStore;
-import com.axelor.meta.db.MetaJsonField;
 import com.axelor.meta.db.MetaJsonRecord;
+import com.axelor.meta.db.repo.MetaJsonFieldRepository;
 import com.axelor.meta.schema.views.Selection.Option;
 import com.axelor.rpc.Context;
 import com.axelor.rpc.JsonContext;
@@ -42,7 +45,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.List;
 import javax.script.SimpleBindings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,6 +73,8 @@ public class WkfTrackingService {
 
   @Inject private WkfTrackingTimeRepository trackingTimeRepo;
 
+  @Inject private MetaJsonFieldRepository jsonFieldRepo;
+
   private BigDecimal durationHrs;
 
   private String oldStatus;
@@ -84,7 +88,8 @@ public class WkfTrackingService {
    * @param status Current wkfStatus of record.
    * @throws ClassNotFoundException
    */
-  public void track(Object object) {
+  @CallMethod
+  public void track(Long wkfId, Object object, boolean isPreview) {
 
     if (object != null) {
 
@@ -104,26 +109,38 @@ public class WkfTrackingService {
       } else {
         ctx = new Context(model.getId(), object.getClass());
       }
-
+      ctx.put("wkfId", wkfId);
       WkfTracking wkfTracking = getWorkflowTracking(ctx, object.getClass().getName());
 
       if (wkfTracking == null) {
         return;
       }
 
-      MetaJsonField wkfField = wkfTracking.getWkf().getStatusField();
+      String wkfFieldName = Beans.get(WkfService.class).getWkfFieldInfo(wkfTracking.getWkf())[0];
+      String selectionFieldName = wkfFieldName;
+      if (isPreview) {
+        wkfFieldName =
+            jsonFieldRepo
+                .findByName("wkf" + wkfTracking.getWkf().getCode() + "wkf" + wkfFieldName)
+                .getName();
+      }
+      String selection =
+          "wkf."
+              + Inflector.getInstance().dasherize(wkfTracking.getWkf().getName()).replace("_", ".");
+      selection +=
+          "." + Inflector.getInstance().dasherize(selectionFieldName).replace("_", ".") + ".select";
 
       Object status = null;
-      status = ctx.get(wkfField.getName());
+      status = ctx.get(wkfFieldName);
       log.debug("Status value: {}", status);
 
       if (status == null) {
         return;
       }
 
-      Option item = MetaStore.getSelectionItem(wkfField.getSelection(), status.toString());
+      Option item = MetaStore.getSelectionItem(selection, status.toString());
 
-      log.debug("Fetching option {} from selection {}", status, wkfField.getSelection());
+      log.debug("Fetching option {} from selection {}", status, selection);
       if (item == null) {
         return;
       }
@@ -155,27 +172,9 @@ public class WkfTrackingService {
       model = jsonModel;
     }
 
-    List<Wkf> wkfs = wkfRepo.all().filter("self.model = ?1", model).fetch();
-
-    if (wkfs.isEmpty()) {
-      log.debug("Workflow not found for model: {}", model);
+    Wkf wkf = wkfRepo.find((Long) ctx.get("wkfId"));
+    if (wkf == null) {
       return null;
-    }
-
-    Wkf wkf = null;
-
-    if (wkfs.size() > 1) {
-      for (Wkf w : wkfs) {
-        if (ctx.get(w.getJsonField()) != null) {
-          wkf = w;
-          break;
-        }
-      }
-      if (wkf == null) {
-        return null;
-      }
-    } else {
-      wkf = wkfs.get(0);
     }
 
     WkfTracking wkfTracking =

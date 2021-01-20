@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -47,6 +47,11 @@ public interface IExceptionMessage {
   static final String CONVERT_LEAD_MISSING = /*$$(*/ "Parent lead is missing." /*)*/;
   static final String CONVERT_LEAD_ERROR = /*$$(*/ "Error in lead conversion" /*)*/;
 
+  static final String LEAD_PARTNER_MISSING_ADDRESS = /*$$(*/
+      "Please complete the partner address." /*)*/;
+  static final String LEAD_CONTACT_MISSING_ADDRESS = /*$$(*/
+      "Please complete the contact address." /*)*/;
+
   /** Event controller */
   static final String EVENT_1 = /*$$(*/ "Input location please" /*)*/;
 
@@ -64,7 +69,7 @@ public interface IExceptionMessage {
 
   /** Configuration */
   static final String CRM_CONFIG_1 = /*$$(*/
-      "Please configure informations for CRM for company %s" /*)*/;
+      "Please configure information for CRM for company %s" /*)*/;
 
   static final String CRM_CONFIG_USER_EMAIL = /*$$(*/
       "User %s does not have an email address configured nor is it linked to a partner with an email address configured." /*)*/;
@@ -87,4 +92,6 @@ public interface IExceptionMessage {
       "The number of repetitions must be greater than 0" /*)*/;
   static final String RECURRENCE_END_DATE = /*$$(*/
       "The end date must be after the start date" /*)*/;
+  public static final String OPPORTUNITY_1 = /*$$(*/
+      "There's no configured sequence for opportunities for the company %s" /*)*/;
 }

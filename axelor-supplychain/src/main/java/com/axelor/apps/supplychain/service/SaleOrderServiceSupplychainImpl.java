@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -26,8 +26,10 @@ import com.axelor.apps.base.service.PartnerService;
 import com.axelor.apps.sale.db.SaleOrder;
 import com.axelor.apps.sale.db.SaleOrderLine;
 import com.axelor.apps.sale.db.repo.SaleOrderLineRepository;
+import com.axelor.apps.sale.db.repo.SaleOrderRepository;
 import com.axelor.apps.sale.service.saleorder.SaleOrderServiceImpl;
 import com.axelor.apps.stock.db.StockMove;
+import com.axelor.apps.stock.db.StockMoveLine;
 import com.axelor.apps.stock.db.repo.StockMoveRepository;
 import com.axelor.apps.stock.service.StockMoveService;
 import com.axelor.apps.supplychain.db.Timetable;
@@ -49,19 +51,24 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class SaleOrderServiceSupplychainImpl extends SaleOrderServiceImpl {
+public class SaleOrderServiceSupplychainImpl extends SaleOrderServiceImpl
+    implements SaleOrderSupplychainService {
 
   private final Logger logger = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   protected AppSupplychain appSupplychain;
   protected SaleOrderStockService saleOrderStockService;
+  protected SaleOrderRepository saleOrderRepository;
 
   @Inject
   public SaleOrderServiceSupplychainImpl(
-      AppSupplychainService appSupplychainService, SaleOrderStockService saleOrderStockService) {
+      AppSupplychainService appSupplychainService,
+      SaleOrderStockService saleOrderStockService,
+      SaleOrderRepository saleOrderRepository) {
 
     this.appSupplychain = appSupplychainService.getAppSupplychain();
     this.saleOrderStockService = saleOrderStockService;
+    this.saleOrderRepository = saleOrderRepository;
   }
 
   public SaleOrder getClientInformations(SaleOrder saleOrder) {
@@ -86,17 +93,20 @@ public class SaleOrderServiceSupplychainImpl extends SaleOrderServiceImpl {
     BigDecimal sumTimetableAmount = BigDecimal.ZERO;
     if (timetableList != null) {
       for (Timetable timetable : timetableList) {
-        sumTimetableAmount =
-            sumTimetableAmount.add(timetable.getAmount().multiply(timetable.getQty()));
+        sumTimetableAmount = sumTimetableAmount.add(timetable.getAmount());
       }
     }
     saleOrder.setAmountToBeSpreadOverTheTimetable(totalHT.subtract(sumTimetableAmount));
   }
 
   @Override
-  @Transactional(rollbackOn = {Exception.class, AxelorException.class})
+  @Transactional(rollbackOn = {Exception.class})
   public boolean enableEditOrder(SaleOrder saleOrder) throws AxelorException {
     boolean checkAvailabiltyRequest = super.enableEditOrder(saleOrder);
+
+    if (!Beans.get(AppSupplychainService.class).isApp("supplychain")) {
+      return checkAvailabiltyRequest;
+    }
 
     List<StockMove> allStockMoves =
         Beans.get(StockMoveRepository.class)
@@ -107,8 +117,7 @@ public class SaleOrderServiceSupplychainImpl extends SaleOrderServiceImpl {
             .fetch();
     List<StockMove> stockMoves =
         !allStockMoves.isEmpty()
-            ? allStockMoves
-                .stream()
+            ? allStockMoves.stream()
                 .filter(stockMove -> !stockMove.getAvailabilityRequest())
                 .collect(Collectors.toList())
             : allStockMoves;
@@ -125,8 +134,15 @@ public class SaleOrderServiceSupplychainImpl extends SaleOrderServiceImpl {
             IExceptionMessage.SUPPLYCHAIN_MISSING_CANCEL_REASON_ON_CHANGING_SALE_ORDER);
       }
       for (StockMove stockMove : stockMoves) {
-        stockMoveService.cancel(stockMove, cancelReason);
-        stockMoveRepository.remove(stockMove);
+        if (stockMove.getStatusSelect().equals(StockMoveRepository.STATUS_DRAFT)) {
+          stockMoveService.cancel(stockMove, cancelReason);
+          stockMoveRepository.remove(stockMove);
+        } else {
+          stockMoveService.cancel(stockMove, cancelReason);
+          for (StockMoveLine stockMoveline : stockMove.getStockMoveLineList()) {
+            stockMoveline.setSaleOrderLine(null);
+          }
+        }
       }
     }
     return checkAvailabiltyRequest;
@@ -142,6 +158,11 @@ public class SaleOrderServiceSupplychainImpl extends SaleOrderServiceImpl {
   @Override
   public void checkModifiedConfirmedOrder(SaleOrder saleOrder, SaleOrder saleOrderView)
       throws AxelorException {
+
+    if (!Beans.get(AppSupplychainService.class).isApp("supplychain")) {
+      super.checkModifiedConfirmedOrder(saleOrder, saleOrderView);
+      return;
+    }
 
     List<SaleOrderLine> saleOrderLineList =
         MoreObjects.firstNonNull(saleOrder.getSaleOrderLineList(), Collections.emptyList());
@@ -178,9 +199,13 @@ public class SaleOrderServiceSupplychainImpl extends SaleOrderServiceImpl {
   }
 
   @Override
-  @Transactional(rollbackOn = {AxelorException.class, RuntimeException.class})
+  @Transactional(rollbackOn = {Exception.class})
   public void validateChanges(SaleOrder saleOrder) throws AxelorException {
     super.validateChanges(saleOrder);
+
+    if (!Beans.get(AppSupplychainService.class).isApp("supplychain")) {
+      return;
+    }
 
     saleOrderStockService.fullyUpdateDeliveryState(saleOrder);
     saleOrder.setOrderBeingEdited(false);
@@ -188,5 +213,12 @@ public class SaleOrderServiceSupplychainImpl extends SaleOrderServiceImpl {
     if (appSupplychain.getCustomerStockMoveGenerationAuto()) {
       saleOrderStockService.createStocksMovesFromSaleOrder(saleOrder);
     }
+  }
+
+  @Override
+  @Transactional
+  public void updateToConfirmedStatus(SaleOrder saleOrder) {
+    saleOrder.setStatusSelect(SaleOrderRepository.STATUS_ORDER_CONFIRMED);
+    saleOrderRepository.save(saleOrder);
   }
 }

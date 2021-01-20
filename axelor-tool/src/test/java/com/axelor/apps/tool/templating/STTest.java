@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -46,7 +46,7 @@ public class STTest {
           + "<p><strong>Title: $contact.title$</p>"
           + "<p><strong>First Name:</strong> $contact.firstName$</p>"
           + "<p><strong>Last Name:</strong> $contact.lastName;format=\"upper\"$</p>"
-          + "<p><strong>DateOfBirth:</strong> $contact.dateOfBirth;format=\"dd/MM/YYYY\"$</p>"
+          + "<p><strong>DateOfBirth:</strong> $contact.dateOfBirth;format=\"dd/MM/yyyy\"$</p>"
           + "<p>&nbsp;</p>"
           + "<p><em>Contact me:</em>&nbsp;<a href='mailto:$contact.email$' target='_blank'>$contact.fullName$</a></p>"
           + "<hr />$__time__;format=\"HH\"$"
@@ -125,12 +125,11 @@ public class STTest {
 
   @Test
   public void test1() {
-    TemplateMaker maker = new TemplateMaker(new Locale("fr"), '$', '$');
+    TemplateMaker maker = new TemplateMaker("Europe/Paris", Locale.FRENCH, '$', '$');
 
     maker.setTemplate(content);
     maker.setContext(contact, map, "contact");
     String result = maker.make();
-
     Assert.assertNotNull(result);
     Assert.assertEquals(contentFinal, result);
   }
@@ -139,7 +138,7 @@ public class STTest {
   public void test2() {
     long start = System.currentTimeMillis();
 
-    TemplateMaker maker = new TemplateMaker(new Locale("fr"), '$', '$');
+    TemplateMaker maker = new TemplateMaker("Europe/Paris", Locale.FRENCH, '$', '$');
 
     for (int i = 0; i < 10000; i++) {
       maker.setTemplate(content);
@@ -167,7 +166,7 @@ public class STTest {
     public void run() {
       long start = System.currentTimeMillis();
 
-      TemplateMaker maker = new TemplateMaker(new Locale("fr"), '$', '$');
+      TemplateMaker maker = new TemplateMaker("Europe/Paris", Locale.FRENCH, '$', '$');
 
       for (int i = 0; i < 10000; i++) {
         maker.setTemplate(content);

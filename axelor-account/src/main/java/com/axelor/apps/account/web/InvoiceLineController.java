@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,10 +18,12 @@
 package com.axelor.apps.account.web;
 
 import com.axelor.apps.account.db.Account;
+import com.axelor.apps.account.db.AccountManagement;
 import com.axelor.apps.account.db.FixedAssetCategory;
 import com.axelor.apps.account.db.Invoice;
 import com.axelor.apps.account.db.InvoiceLine;
 import com.axelor.apps.account.db.TaxLine;
+import com.axelor.apps.account.db.repo.AccountTypeRepository;
 import com.axelor.apps.account.db.repo.InvoiceLineRepository;
 import com.axelor.apps.account.db.repo.InvoiceRepository;
 import com.axelor.apps.account.service.AccountManagementServiceAccountImpl;
@@ -38,17 +40,18 @@ import com.axelor.rpc.ActionRequest;
 import com.axelor.rpc.ActionResponse;
 import com.axelor.rpc.Context;
 import com.google.common.base.Strings;
-import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Singleton
 public class InvoiceLineController {
-
-  @Inject private InvoiceLineService invoiceLineService;
 
   public void getAndComputeAnalyticDistribution(ActionRequest request, ActionResponse response)
       throws AxelorException {
@@ -60,7 +63,8 @@ public class InvoiceLineController {
 
     response.setValue(
         "analyticMoveLineList",
-        invoiceLineService.getAndComputeAnalyticDistribution(invoiceLine, invoice));
+        Beans.get(InvoiceLineService.class)
+            .getAndComputeAnalyticDistribution(invoiceLine, invoice));
     response.setValue(
         "analyticDistributionTemplate", invoiceLine.getAnalyticDistributionTemplate());
   }
@@ -71,7 +75,7 @@ public class InvoiceLineController {
 
     response.setValue(
         "analyticMoveLineList",
-        invoiceLineService.createAnalyticDistributionWithTemplate(invoiceLine));
+        Beans.get(InvoiceLineService.class).createAnalyticDistributionWithTemplate(invoiceLine));
   }
 
   public void computeAnalyticDistribution(ActionRequest request, ActionResponse response)
@@ -81,13 +85,15 @@ public class InvoiceLineController {
 
     if (Beans.get(AppAccountService.class).getAppAccount().getManageAnalyticAccounting()) {
       response.setValue(
-          "analyticMoveLineList", invoiceLineService.computeAnalyticDistribution(invoiceLine));
+          "analyticMoveLineList",
+          Beans.get(InvoiceLineService.class).computeAnalyticDistribution(invoiceLine));
     }
   }
 
   public void compute(ActionRequest request, ActionResponse response) throws AxelorException {
 
     Context context = request.getContext();
+    InvoiceLineService invoiceLineService = Beans.get(InvoiceLineService.class);
 
     InvoiceLine invoiceLine = context.asType(InvoiceLine.class);
 
@@ -155,18 +161,19 @@ public class InvoiceLineController {
     Map<String, Object> productInformation = new HashMap<>();
     if (invoice != null && product != null) {
       try {
-        productInformation = invoiceLineService.fillProductInformation(invoice, invoiceLine);
+        productInformation =
+            Beans.get(InvoiceLineService.class).fillProductInformation(invoice, invoiceLine);
 
         String errorMsg = (String) productInformation.get("error");
 
-        if (!Strings.isNullOrEmpty(errorMsg) && invoiceLineService.isAccountRequired(invoiceLine)) {
+        if (!Strings.isNullOrEmpty(errorMsg)) {
           response.setFlash(errorMsg);
         }
       } catch (Exception e) {
         TraceBackService.trace(response, e);
       }
     } else {
-      productInformation = invoiceLineService.resetProductInformation(invoice);
+      productInformation = Beans.get(InvoiceLineService.class).resetProductInformation(invoice);
     }
     response.setValues(productInformation);
   }
@@ -190,20 +197,23 @@ public class InvoiceLineController {
     try {
 
       Map<String, Object> discounts =
-          invoiceLineService.getDiscount(
-              invoice,
-              invoiceLine,
-              invoiceLine.getProduct().getInAti()
-                  ? invoiceLineService.getInTaxUnitPrice(
-                      invoice,
-                      invoiceLine,
-                      invoiceLine.getTaxLine(),
-                      InvoiceToolService.isPurchase(invoice))
-                  : invoiceLineService.getExTaxUnitPrice(
-                      invoice,
-                      invoiceLine,
-                      invoiceLine.getTaxLine(),
-                      InvoiceToolService.isPurchase(invoice)));
+          Beans.get(InvoiceLineService.class)
+              .getDiscount(
+                  invoice,
+                  invoiceLine,
+                  invoiceLine.getProduct().getInAti()
+                      ? Beans.get(InvoiceLineService.class)
+                          .getInTaxUnitPrice(
+                              invoice,
+                              invoiceLine,
+                              invoiceLine.getTaxLine(),
+                              InvoiceToolService.isPurchase(invoice))
+                      : Beans.get(InvoiceLineService.class)
+                          .getExTaxUnitPrice(
+                              invoice,
+                              invoiceLine,
+                              invoiceLine.getTaxLine(),
+                              InvoiceToolService.isPurchase(invoice)));
 
       for (Entry<String, Object> entry : discounts.entrySet()) {
         response.setValue(entry.getKey(), entry.getValue());
@@ -221,15 +231,16 @@ public class InvoiceLineController {
    * @param response
    */
   public void updatePrice(ActionRequest request, ActionResponse response) {
-    Context context = request.getContext();
 
+    Context context = request.getContext();
     InvoiceLine invoiceLine = context.asType(InvoiceLine.class);
 
     try {
       BigDecimal inTaxPrice = invoiceLine.getInTaxPrice();
       TaxLine taxLine = invoiceLine.getTaxLine();
 
-      response.setValue("price", invoiceLineService.convertUnitPrice(true, taxLine, inTaxPrice));
+      response.setValue(
+          "price", Beans.get(InvoiceLineService.class).convertUnitPrice(true, taxLine, inTaxPrice));
     } catch (Exception e) {
       TraceBackService.trace(response, e);
     }
@@ -251,7 +262,8 @@ public class InvoiceLineController {
       TaxLine taxLine = invoiceLine.getTaxLine();
 
       response.setValue(
-          "inTaxPrice", invoiceLineService.convertUnitPrice(false, taxLine, exTaxPrice));
+          "inTaxPrice",
+          Beans.get(InvoiceLineService.class).convertUnitPrice(false, taxLine, exTaxPrice));
     } catch (Exception e) {
       TraceBackService.trace(response, e);
     }
@@ -347,19 +359,24 @@ public class InvoiceLineController {
   public void filterAccount(ActionRequest request, ActionResponse response) throws AxelorException {
     Context context = request.getContext();
     Invoice invoice = this.getInvoice(context);
+    InvoiceLine invoiceLine = request.getContext().asType(InvoiceLine.class);
     if (invoice != null && invoice.getCompany() != null) {
-      String domain = null;
+      List<String> technicalTypeSelectList = new ArrayList<>();
       if (InvoiceToolService.isPurchase(invoice)) {
-        domain =
-            "self.company.id = "
-                + invoice.getCompany().getId()
-                + "AND self.accountType.technicalTypeSelect IN ('debt' , 'immobilisation' , 'charge')";
+        if (invoiceLine.getFixedAssets()) {
+          technicalTypeSelectList.add(AccountTypeRepository.TYPE_IMMOBILISATION);
+        } else {
+          technicalTypeSelectList.add(AccountTypeRepository.TYPE_DEBT);
+          technicalTypeSelectList.add(AccountTypeRepository.TYPE_CHARGE);
+        }
       } else {
-        domain =
-            "self.company.id = "
-                + invoice.getCompany().getId()
-                + " AND self.accountType.technicalTypeSelect = 'income'";
+        technicalTypeSelectList.add(AccountTypeRepository.TYPE_INCOME);
       }
+      String domain =
+          "self.company.id = "
+              + invoice.getCompany().getId()
+              + " AND self.accountType.technicalTypeSelect IN "
+              + technicalTypeSelectList.stream().collect(Collectors.joining("','", "('", "')"));
       response.setAttr("account", "domain", domain);
     }
   }
@@ -383,14 +400,15 @@ public class InvoiceLineController {
             || invoice.getOperationTypeSelect()
                 == InvoiceRepository.OPERATION_TYPE_SUPPLIER_REFUND)) {
 
-      fixedAssetCategory =
-          product
-              .getAccountManagementList()
-              .stream()
+      Optional<AccountManagement> optionalFixedAssetCategory =
+          product.getAccountManagementList().stream()
               .filter(am -> am.getCompany() == invoice.getCompany())
-              .findFirst()
-              .get()
-              .getFixedAssetCategory();
+              .findFirst();
+
+      fixedAssetCategory =
+          optionalFixedAssetCategory.isPresent()
+              ? optionalFixedAssetCategory.get().getFixedAssetCategory()
+              : null;
     }
     response.setValue("fixedAssetCategory", fixedAssetCategory);
   }

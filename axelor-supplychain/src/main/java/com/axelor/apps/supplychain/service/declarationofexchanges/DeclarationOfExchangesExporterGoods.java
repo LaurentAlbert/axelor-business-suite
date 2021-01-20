@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,6 +18,8 @@
 package com.axelor.apps.supplychain.service.declarationofexchanges;
 
 import com.axelor.apps.ReportFactory;
+import com.axelor.apps.account.db.Invoice;
+import com.axelor.apps.account.db.repo.InvoiceRepository;
 import com.axelor.apps.base.db.Address;
 import com.axelor.apps.base.db.Period;
 import com.axelor.apps.base.db.Product;
@@ -34,6 +36,7 @@ import com.axelor.apps.supplychain.db.DeclarationOfExchanges;
 import com.axelor.apps.supplychain.report.IReport;
 import com.axelor.apps.tool.file.CsvTool;
 import com.axelor.auth.AuthUtils;
+import com.axelor.auth.db.User;
 import com.axelor.common.StringUtils;
 import com.axelor.exception.AxelorException;
 import com.axelor.exception.db.repo.TraceBackRepository;
@@ -48,7 +51,9 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.ResourceBundle;
+import java.util.Set;
 
 public class DeclarationOfExchangesExporterGoods extends DeclarationOfExchangesExporter {
   protected static final String NAME_GOODS = /*$$(*/ "Declaration of exchanges of goods" /*)*/;
@@ -269,8 +274,16 @@ public class DeclarationOfExchangesExporterGoods extends DeclarationOfExchangesE
     }
 
     String invoiceId = "";
-    if (stockMove.getInvoice() != null) {
-      invoiceId = stockMove.getInvoice().getInvoiceId();
+    Set<Invoice> invoiceSet = stockMove.getInvoiceSet();
+    if (invoiceSet != null) {
+      for (Invoice invoice : invoiceSet) {
+        if (invoice.getStatusSelect() == InvoiceRepository.STATUS_VENTILATED) {
+          invoiceId += invoice.getInvoiceId() + "|";
+        }
+      }
+      if (invoiceId != null && !invoiceId.isEmpty()) {
+        invoiceId = invoiceId.substring(0, invoiceId.length() - 1);
+      }
     }
 
     data[columnHeadersList.indexOf(LINE_NUM)] = String.valueOf(lineNum);
@@ -297,7 +310,7 @@ public class DeclarationOfExchangesExporterGoods extends DeclarationOfExchangesE
   protected String exportToPDF() throws AxelorException {
     return ReportFactory.createReport(IReport.DECLARATION_OF_EXCHANGES_OF_GOODS, getTitle())
         .addParam("DeclarationOfExchangesId", declarationOfExchanges.getId())
-        .addParam("UserId", AuthUtils.getUser().getId())
+        .addParam("UserId", Optional.ofNullable(AuthUtils.getUser()).map(User::getId).orElse(null))
         .addParam("Locale", ReportSettings.getPrintingLocale())
         .addFormat(declarationOfExchanges.getFormatSelect())
         .toAttach(declarationOfExchanges)

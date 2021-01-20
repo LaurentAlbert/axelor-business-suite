@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -20,6 +20,8 @@ package com.axelor.apps.production.service.operationorder;
 import com.axelor.apps.base.db.DayPlanning;
 import com.axelor.apps.base.service.BarcodeGeneratorService;
 import com.axelor.apps.base.service.weeklyplanning.WeeklyPlanningService;
+import com.axelor.apps.production.db.Machine;
+import com.axelor.apps.production.db.MachineTool;
 import com.axelor.apps.production.db.ManufOrder;
 import com.axelor.apps.production.db.OperationOrder;
 import com.axelor.apps.production.db.ProdHumanResource;
@@ -75,7 +77,7 @@ public class OperationOrderServiceImpl implements OperationOrderService {
       DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
   private final Logger logger = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public OperationOrder createOperationOrder(ManufOrder manufOrder, ProdProcessLine prodProcessLine)
       throws AxelorException {
 
@@ -84,18 +86,20 @@ public class OperationOrderServiceImpl implements OperationOrderService {
             manufOrder,
             prodProcessLine.getPriority(),
             prodProcessLine.getWorkCenter(),
-            prodProcessLine.getWorkCenter(),
+            prodProcessLine.getWorkCenter().getMachine(),
+            prodProcessLine.getMachineTool(),
             prodProcessLine);
 
     return Beans.get(OperationOrderRepository.class).save(operationOrder);
   }
 
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public OperationOrder createOperationOrder(
       ManufOrder manufOrder,
       int priority,
       WorkCenter workCenter,
-      WorkCenter machineWorkCenter,
+      Machine machine,
+      MachineTool machineTool,
       ProdProcessLine prodProcessLine)
       throws AxelorException {
 
@@ -111,11 +115,15 @@ public class OperationOrderServiceImpl implements OperationOrderService {
             operationName,
             manufOrder,
             workCenter,
-            machineWorkCenter,
+            machine,
             OperationOrderRepository.STATUS_DRAFT,
-            prodProcessLine);
+            prodProcessLine,
+            machineTool);
 
-    this._createHumanResourceList(operationOrder, machineWorkCenter);
+    this._createHumanResourceList(operationOrder, workCenter);
+
+    operationOrder.setUseLineInGeneratedPurchaseOrder(
+        prodProcessLine.getUseLineInGeneratedPurchaseOrder());
 
     return Beans.get(OperationOrderRepository.class).save(operationOrder);
   }
@@ -355,23 +363,38 @@ public class OperationOrderServiceImpl implements OperationOrderService {
                     LocalDateTime.parse(itDateTime.toString(), DateTimeFormatter.ISO_DATE_TIME)
                         .toLocalDate());
             if (dayPlanning != null) {
-              numberOfMinutesPerDay =
-                  Duration.between(dayPlanning.getMorningFrom(), dayPlanning.getMorningTo())
-                      .toMinutes();
-              numberOfMinutesPerDay +=
-                  Duration.between(dayPlanning.getAfternoonFrom(), dayPlanning.getAfternoonTo())
-                      .toMinutes();
+              if (dayPlanning.getMorningFrom() != null && dayPlanning.getMorningTo() != null) {
+                numberOfMinutesPerDay =
+                    Duration.between(dayPlanning.getMorningFrom(), dayPlanning.getMorningTo())
+                        .toMinutes();
+              }
+              if (dayPlanning.getAfternoonFrom() != null && dayPlanning.getAfternoonTo() != null) {
+                numberOfMinutesPerDay +=
+                    Duration.between(dayPlanning.getAfternoonFrom(), dayPlanning.getAfternoonTo())
+                        .toMinutes();
+              }
+              if (dayPlanning.getMorningFrom() != null
+                  && dayPlanning.getMorningTo() == null
+                  && dayPlanning.getAfternoonFrom() == null
+                  && dayPlanning.getAfternoonTo() != null) {
+                numberOfMinutesPerDay +=
+                    Duration.between(dayPlanning.getMorningFrom(), dayPlanning.getAfternoonTo())
+                        .toMinutes();
+              }
+
             } else {
               numberOfMinutesPerDay = 0;
             }
           } else {
-            numberOfMinutesPerDay = 60 * 8;
+            numberOfMinutesPerDay = 60 * 24;
           }
           if (numberOfMinutesPerDay != 0) {
+
             BigDecimal percentage =
                 new BigDecimal(numberOfMinutes)
                     .multiply(new BigDecimal(100))
                     .divide(new BigDecimal(numberOfMinutesPerDay), 2, RoundingMode.HALF_UP);
+
             if (map.containsKey(machine)) {
               map.put(machine, map.get(machine).add(percentage));
             } else {
@@ -432,7 +455,7 @@ public class OperationOrderServiceImpl implements OperationOrderService {
   }
 
   @Override
-  @Transactional(rollbackOn = {AxelorException.class, RuntimeException.class})
+  @Transactional(rollbackOn = {Exception.class})
   public void updateConsumedStockMoveFromOperationOrder(OperationOrder operationOrder)
       throws AxelorException {
     this.updateDiffProdProductList(operationOrder);
@@ -441,9 +464,7 @@ public class OperationOrderServiceImpl implements OperationOrderService {
       return;
     }
     Optional<StockMove> stockMoveOpt =
-        operationOrder
-            .getInStockMoveList()
-            .stream()
+        operationOrder.getInStockMoveList().stream()
             .filter(stockMove -> stockMove.getStatusSelect() == StockMoveRepository.STATUS_PLANNED)
             .findFirst();
     StockMove stockMove;

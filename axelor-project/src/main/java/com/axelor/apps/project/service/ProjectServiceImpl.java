@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -20,21 +20,28 @@ package com.axelor.apps.project.service;
 import com.axelor.apps.base.db.Company;
 import com.axelor.apps.base.db.Partner;
 import com.axelor.apps.project.db.Project;
+import com.axelor.apps.project.db.ProjectTemplate;
+import com.axelor.apps.project.db.TaskTemplate;
+import com.axelor.apps.project.db.Wiki;
 import com.axelor.apps.project.db.repo.ProjectRepository;
-import com.axelor.apps.project.exception.IExceptionMessage;
+import com.axelor.apps.project.db.repo.WikiRepository;
+import com.axelor.apps.project.translation.ITranslation;
 import com.axelor.auth.AuthUtils;
 import com.axelor.auth.db.User;
-import com.axelor.db.JPA;
 import com.axelor.exception.AxelorException;
 import com.axelor.exception.db.repo.TraceBackRepository;
 import com.axelor.i18n.I18n;
 import com.axelor.inject.Beans;
+import com.axelor.team.db.TeamTask;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.inject.Inject;
 import com.google.inject.persist.Transactional;
 import java.math.BigDecimal;
-import javax.persistence.TypedQuery;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Set;
 
 public class ProjectServiceImpl implements ProjectService {
 
@@ -47,6 +54,9 @@ public class ProjectServiceImpl implements ProjectService {
     this.projectRepository = projectRepository;
   }
 
+  @Inject WikiRepository wikiRepo;
+  @Inject TeamTaskProjectService teamTaskProjectService;
+
   @Override
   public Project generateProject(
       Project parentProject,
@@ -54,7 +64,12 @@ public class ProjectServiceImpl implements ProjectService {
       User assignedTo,
       Company company,
       Partner clientPartner) {
-    Project project = new Project();
+    Project project;
+    project = projectRepository.findByName(fullName);
+    if (project != null) {
+      return project;
+    }
+    project = new Project();
     project.setStatusSelect(ProjectRepository.STATE_NEW);
     project.setParentProject(parentProject);
     if (parentProject != null) {
@@ -76,7 +91,7 @@ public class ProjectServiceImpl implements ProjectService {
   }
 
   @Override
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional
   public Project generateProject(Partner partner) {
     Preconditions.checkNotNull(partner);
     User user = AuthUtils.getUser();
@@ -106,38 +121,73 @@ public class ProjectServiceImpl implements ProjectService {
   }
 
   @Override
-  public Partner getClientPartnerFromProject(Project project) throws AxelorException {
-    return this.getClientPartnerFromProject(project, 0);
-  }
+  @Transactional
+  public Project createProjectFromTemplate(
+      ProjectTemplate projectTemplate, String projectCode, Partner clientPartner)
+      throws AxelorException {
 
-  private Partner getClientPartnerFromProject(Project project, int counter) throws AxelorException {
-    if (project.getParentProject() == null) {
-      // it is a root project, can get the client partner
-      if (project.getClientPartner() == null) {
-        throw new AxelorException(
-            TraceBackRepository.CATEGORY_CONFIGURATION_ERROR,
-            I18n.get(IExceptionMessage.PROJECT_CUSTOMER_PARTNER));
-      } else {
-        return project.getClientPartner();
-      }
+    Project project = new Project();
+    project.setName(projectTemplate.getName());
+
+    if (projectRepository.all().filter("self.code = ?", projectCode).count() > 0) {
+      throw new AxelorException(
+          TraceBackRepository.CATEGORY_INCONSISTENCY, ITranslation.PROJECT_CODE_ERROR);
     } else {
-      if (counter > MAX_LEVEL_OF_PROJECT) {
-        throw new AxelorException(
-            TraceBackRepository.CATEGORY_CONFIGURATION_ERROR,
-            I18n.get(IExceptionMessage.PROJECT_DEEP_LIMIT_REACH));
-      } else {
-        return this.getClientPartnerFromProject(project.getParentProject(), counter + 1);
+
+      project.setCode(projectCode);
+      project.setClientPartner(clientPartner);
+      if (clientPartner != null
+          && clientPartner.getContactPartnerSet() != null
+          && !clientPartner.getContactPartnerSet().isEmpty()) {
+        project.setContactPartner(clientPartner.getContactPartnerSet().iterator().next());
       }
+      project.setDescription(projectTemplate.getDescription());
+      project.setTeam(projectTemplate.getTeam());
+      project.setProjectFolderSet(new HashSet<>(projectTemplate.getProjectFolderSet()));
+      project.setAssignedTo(projectTemplate.getAssignedTo());
+      project.setTeamTaskCategorySet(new HashSet<>(projectTemplate.getTeamTaskCategorySet()));
+      project.setSynchronize(projectTemplate.getSynchronize());
+      project.setMembersUserSet(new HashSet<>(projectTemplate.getMembersUserSet()));
+      project.setImputable(projectTemplate.getImputable());
+      project.setCompany(projectTemplate.getCompany());
+      project.setProductSet(new HashSet<>(projectTemplate.getProductSet()));
+      project.setExcludePlanning(projectTemplate.getExcludePlanning());
+      project.setProjectTypeSelect(ProjectRepository.TYPE_PROJECT);
+
+      List<Wiki> wikiList = projectTemplate.getWikiList();
+
+      if (wikiList != null && !wikiList.isEmpty()) {
+
+        for (Wiki wiki : wikiList) {
+          wiki = wikiRepo.copy(wiki, false);
+          wiki.setProjectTemplate(null);
+          project.addWikiListItem(wiki);
+        }
+      }
+
+      projectRepository.save(project);
+
+      Set<TaskTemplate> taskTemplateSet = projectTemplate.getTaskTemplateSet();
+
+      if (taskTemplateSet != null) {
+        Iterator<TaskTemplate> taskTemplateItr = taskTemplateSet.iterator();
+
+        while (taskTemplateItr.hasNext()) {
+          createTask(taskTemplateItr.next(), project);
+        }
+      }
+
+      return project;
     }
   }
 
-  @Override
-  public BigDecimal computeDurationFromChildren(Long projectId) {
-    String query =
-        "SELECT SUM(pt.duration)" + " FROM Project as pt" + " WHERE pt.project.id = :projectId";
+  public TeamTask createTask(TaskTemplate taskTemplate, Project project) {
 
-    TypedQuery<BigDecimal> q = JPA.em().createQuery(query, BigDecimal.class);
-    q.setParameter("projectId", projectId);
-    return q.getSingleResult();
+    TeamTask task =
+        teamTaskProjectService.create(
+            taskTemplate.getName(), project, taskTemplate.getAssignedTo());
+    task.setDescription(taskTemplate.getDescription());
+
+    return task;
   }
 }

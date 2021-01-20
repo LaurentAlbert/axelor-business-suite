@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -35,7 +35,6 @@ import com.axelor.db.JPA;
 import com.axelor.db.annotations.Widget;
 import com.axelor.db.mapper.Mapper;
 import com.axelor.db.mapper.Property;
-import com.axelor.exception.AxelorException;
 import com.axelor.exception.service.TraceBackService;
 import com.axelor.inject.Beans;
 import com.axelor.meta.db.MetaField;
@@ -49,8 +48,6 @@ import com.google.inject.Inject;
 import com.google.inject.persist.Transactional;
 import java.lang.reflect.Field;
 import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -64,10 +61,13 @@ import javax.validation.constraints.NotNull;
 public class ConfiguratorCreatorServiceImpl implements ConfiguratorCreatorService {
 
   private ConfiguratorCreatorRepository configuratorCreatorRepo;
+  private AppBaseService appBaseService;
 
   @Inject
-  public ConfiguratorCreatorServiceImpl(ConfiguratorCreatorRepository configuratorCreatorRepo) {
+  public ConfiguratorCreatorServiceImpl(
+      ConfiguratorCreatorRepository configuratorCreatorRepo, AppBaseService appBaseService) {
     this.configuratorCreatorRepo = configuratorCreatorRepo;
+    this.appBaseService = appBaseService;
   }
 
   @Override
@@ -154,9 +154,11 @@ public class ConfiguratorCreatorServiceImpl implements ConfiguratorCreatorServic
       case "boolean":
         return true;
       case "datetime":
-        return LocalDateTime.of(LocalDate.now(), LocalTime.now());
+        return appBaseService.getTodayDateTime(
+            Optional.ofNullable(AuthUtils.getUser()).map(User::getActiveCompany).orElse(null));
       case "date":
-        return LocalDate.now();
+        return appBaseService.getTodayDate(
+            Optional.ofNullable(AuthUtils.getUser()).map(User::getActiveCompany).orElse(null));
       case "time":
         return LocalTime.now();
       case "panel":
@@ -406,12 +408,13 @@ public class ConfiguratorCreatorServiceImpl implements ConfiguratorCreatorServic
 
   @Override
   @Transactional
-  public void authorizeUser(ConfiguratorCreator creator, User user) {
-    creator.addAuthorizedUserSetItem(user);
+  public void init(ConfiguratorCreator creator) {
+    creator.addAuthorizedUserSetItem(AuthUtils.getUser());
+    addRequiredFormulas(creator);
   }
 
   @Override
-  @Transactional(rollbackOn = {AxelorException.class, RuntimeException.class})
+  @Transactional
   public void addRequiredFormulas(ConfiguratorCreator creator) {
     for (Field field : Product.class.getDeclaredFields()) {
       if (field.getAnnotation(NotNull.class) != null) {
@@ -423,7 +426,6 @@ public class ConfiguratorCreatorServiceImpl implements ConfiguratorCreatorServic
         creator.addConfiguratorSOLineFormulaListItem(createSOLineFormula(field.getName()));
       }
     }
-    configuratorCreatorRepo.save(creator);
   }
 
   /**

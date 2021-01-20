@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -73,30 +73,6 @@ public class AccountConfigService {
       throw new AxelorException(
           TraceBackRepository.CATEGORY_CONFIGURATION_ERROR,
           I18n.get(IExceptionMessage.ACCOUNT_CONFIG_3),
-          I18n.get(com.axelor.apps.base.exceptions.IExceptionMessage.EXCEPTION),
-          accountConfig.getCompany().getName());
-    }
-  }
-
-  public void getRejectImportPathAndFileName(AccountConfig accountConfig) throws AxelorException {
-
-    if (accountConfig.getRejectImportPathAndFileName() == null
-        || accountConfig.getRejectImportPathAndFileName().isEmpty()) {
-      throw new AxelorException(
-          TraceBackRepository.CATEGORY_CONFIGURATION_ERROR,
-          I18n.get(IExceptionMessage.ACCOUNT_CONFIG_8),
-          I18n.get(com.axelor.apps.base.exceptions.IExceptionMessage.EXCEPTION),
-          accountConfig.getCompany().getName());
-    }
-  }
-
-  public void getTempImportPathAndFileName(AccountConfig accountConfig) throws AxelorException {
-
-    if (accountConfig.getTempImportPathAndFileName() == null
-        || accountConfig.getTempImportPathAndFileName().isEmpty()) {
-      throw new AxelorException(
-          TraceBackRepository.CATEGORY_CONFIGURATION_ERROR,
-          I18n.get(IExceptionMessage.ACCOUNT_CONFIG_9),
           I18n.get(com.axelor.apps.base.exceptions.IExceptionMessage.EXCEPTION),
           accountConfig.getCompany().getName());
     }
@@ -223,6 +199,18 @@ public class AccountConfigService {
           accountConfig.getCompany().getName());
     }
     return accountConfig.getReimbursementJournal();
+  }
+
+  public Journal getReportedBalanceJournal(AccountConfig accountConfig) throws AxelorException {
+
+    if (accountConfig.getReportedBalanceJournal() == null) {
+      throw new AxelorException(
+          TraceBackRepository.CATEGORY_CONFIGURATION_ERROR,
+          I18n.get(IExceptionMessage.ACCOUNT_CONFIG_45),
+          I18n.get(com.axelor.apps.base.exceptions.IExceptionMessage.EXCEPTION),
+          accountConfig.getCompany().getName());
+    }
+    return accountConfig.getReportedBalanceJournal();
   }
 
   /** ****************************** JOURNAL TYPE ******************************************* */
@@ -370,6 +358,30 @@ public class AccountConfigService {
           accountConfig.getCompany().getName());
     }
     return accountConfig.getDoubtfulCustomerAccount();
+  }
+
+  public Account getYearOpeningAccount(AccountConfig accountConfig) throws AxelorException {
+
+    if (accountConfig.getYearOpeningAccount() == null) {
+      throw new AxelorException(
+          TraceBackRepository.CATEGORY_CONFIGURATION_ERROR,
+          I18n.get(IExceptionMessage.ACCOUNT_CONFIG_43),
+          I18n.get(com.axelor.apps.base.exceptions.IExceptionMessage.EXCEPTION),
+          accountConfig.getCompany().getName());
+    }
+    return accountConfig.getYearOpeningAccount();
+  }
+
+  public Account getYearClosureAccount(AccountConfig accountConfig) throws AxelorException {
+
+    if (accountConfig.getYearClosureAccount() == null) {
+      throw new AxelorException(
+          TraceBackRepository.CATEGORY_CONFIGURATION_ERROR,
+          I18n.get(IExceptionMessage.ACCOUNT_CONFIG_44),
+          I18n.get(com.axelor.apps.base.exceptions.IExceptionMessage.EXCEPTION),
+          accountConfig.getCompany().getName());
+    }
+    return accountConfig.getYearClosureAccount();
   }
 
   /** ****************************** TVA ******************************************* */

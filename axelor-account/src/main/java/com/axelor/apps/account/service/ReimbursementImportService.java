@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -31,6 +31,7 @@ import com.axelor.apps.account.service.move.MoveLineService;
 import com.axelor.apps.account.service.move.MoveService;
 import com.axelor.apps.base.db.Company;
 import com.axelor.apps.base.db.Partner;
+import com.axelor.apps.base.service.app.AppService;
 import com.axelor.exception.AxelorException;
 import com.axelor.exception.db.repo.TraceBackRepository;
 import com.axelor.i18n.I18n;
@@ -55,6 +56,7 @@ public class ReimbursementImportService {
   protected RejectImportService rejectImportService;
   protected AccountConfigService accountConfigService;
   protected ReimbursementRepository reimbursementRepo;
+  protected AppService appService;
 
   @Inject
   public ReimbursementImportService(
@@ -63,7 +65,8 @@ public class ReimbursementImportService {
       MoveLineService moveLineService,
       RejectImportService rejectImportService,
       AccountConfigService accountConfigService,
-      ReimbursementRepository reimbursementRepo) {
+      ReimbursementRepository reimbursementRepo,
+      AppService appService) {
 
     this.moveService = moveService;
     this.moveRepo = moveRepo;
@@ -71,10 +74,13 @@ public class ReimbursementImportService {
     this.rejectImportService = rejectImportService;
     this.accountConfigService = accountConfigService;
     this.reimbursementRepo = reimbursementRepo;
+    this.appService = appService;
   }
 
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public void runReimbursementImport(Company company) throws AxelorException, IOException {
+
+    String dataUploadDir = appService.getFileUploadDir();
 
     this.testCompanyField(company);
 
@@ -82,8 +88,8 @@ public class ReimbursementImportService {
 
     this.createReimbursementRejectMove(
         rejectImportService.getCFONBFile(
-            accountConfig.getReimbursementImportFolderPathCFONB(),
-            accountConfig.getTempReimbImportFolderPathCFONB(),
+            dataUploadDir + accountConfig.getReimbursementImportFolderPathCFONB(),
+            dataUploadDir + accountConfig.getTempReimbImportFolderPathCFONB(),
             company,
             0),
         company);
@@ -119,7 +125,7 @@ public class ReimbursementImportService {
     }
   }
 
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public Reimbursement createReimbursementRejectMoveLine(
       String[] reject, Company company, int seq, Move move, LocalDate rejectDate)
       throws AxelorException {
@@ -173,7 +179,7 @@ public class ReimbursementImportService {
     return reimbursement;
   }
 
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public Move createMoveReject(Company company, LocalDate date) throws AxelorException {
     return moveRepo.save(
         moveService
@@ -197,7 +203,7 @@ public class ReimbursementImportService {
     return totalAmount;
   }
 
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public MoveLine createOppositeRejectMoveLine(Move move, int seq, LocalDate rejectDate)
       throws AxelorException {
     // Création d'une ligne au débit
@@ -217,14 +223,14 @@ public class ReimbursementImportService {
     return debitMoveLine;
   }
 
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public void validateMove(Move move) throws AxelorException {
     moveService.getMoveValidateService().validate(move);
     moveRepo.save(move);
   }
 
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
-  public void deleteMove(Move move) throws AxelorException {
+  @Transactional
+  public void deleteMove(Move move) {
     moveRepo.remove(move);
   }
 

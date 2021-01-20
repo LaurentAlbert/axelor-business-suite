@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -21,6 +21,7 @@ import com.axelor.apps.hr.db.TimesheetLine;
 import com.axelor.apps.hr.service.timesheet.TimesheetLineService;
 import com.axelor.apps.production.db.OperationOrder;
 import com.axelor.apps.production.db.OperationOrderDuration;
+import com.axelor.apps.production.db.repo.MachineToolRepository;
 import com.axelor.apps.production.db.repo.OperationOrderDurationRepository;
 import com.axelor.apps.production.db.repo.OperationOrderRepository;
 import com.axelor.apps.production.service.app.AppProductionService;
@@ -38,12 +39,14 @@ public class OperationOrderWorkflowServiceBusinessImpl extends OperationOrderWor
       OperationOrderStockMoveService operationOrderStockMoveService,
       OperationOrderRepository operationOrderRepo,
       OperationOrderDurationRepository operationOrderDurationRepo,
-      AppProductionService appProductionService) {
+      AppProductionService appProductionService,
+      MachineToolRepository machineToolRepo) {
     super(
         operationOrderStockMoveService,
         operationOrderRepo,
         operationOrderDurationRepo,
-        appProductionService);
+        appProductionService,
+        machineToolRepo);
   }
 
   /**
@@ -55,7 +58,11 @@ public class OperationOrderWorkflowServiceBusinessImpl extends OperationOrderWor
    */
   @Override
   public Duration computeRealDuration(OperationOrder operationOrder) {
-    if (appProductionService.getAppProduction().getEnableTimesheetOnManufOrder()) {
+    AppProductionService appProductionService = Beans.get(AppProductionService.class);
+
+    if (appProductionService.isApp("production")
+        && appProductionService.getAppProduction().getManageBusinessProduction()
+        && appProductionService.getAppProduction().getEnableTimesheetOnManufOrder()) {
       List<TimesheetLine> timesheetLineList = operationOrder.getTimesheetLineList();
       return Beans.get(TimesheetLineService.class).computeTotalDuration(timesheetLineList);
     } else {

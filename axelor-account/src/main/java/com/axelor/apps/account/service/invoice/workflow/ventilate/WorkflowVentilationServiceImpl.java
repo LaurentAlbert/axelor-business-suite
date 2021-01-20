@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -24,9 +24,11 @@ import com.axelor.apps.account.exception.IExceptionMessage;
 import com.axelor.apps.account.service.config.AccountConfigService;
 import com.axelor.apps.account.service.payment.invoice.payment.InvoicePaymentCreateService;
 import com.axelor.apps.base.db.Company;
+import com.axelor.apps.message.exception.AxelorMessageException;
 import com.axelor.apps.message.service.TemplateMessageService;
 import com.axelor.exception.AxelorException;
 import com.axelor.exception.db.repo.TraceBackRepository;
+import com.axelor.exception.service.TraceBackService;
 import com.axelor.i18n.I18n;
 import com.axelor.inject.Beans;
 import com.google.inject.Inject;
@@ -52,7 +54,7 @@ public class WorkflowVentilationServiceImpl implements WorkflowVentilationServic
   }
 
   @Override
-  @Transactional(rollbackOn = {Exception.class, AxelorException.class})
+  @Transactional(rollbackOn = {Exception.class})
   public void afterVentilation(Invoice invoice) throws AxelorException {
     Company company = invoice.getCompany();
 
@@ -68,8 +70,9 @@ public class WorkflowVentilationServiceImpl implements WorkflowVentilationServic
         Beans.get(TemplateMessageService.class)
             .generateAndSendMessage(invoice, invoice.getInvoiceMessageTemplate());
       } catch (Exception e) {
-        throw new AxelorException(
-            TraceBackRepository.CATEGORY_CONFIGURATION_ERROR, e.getMessage(), invoice);
+        TraceBackService.trace(
+            new AxelorMessageException(
+                e, invoice, TraceBackRepository.CATEGORY_CONFIGURATION_ERROR));
       }
     }
   }
@@ -118,7 +121,7 @@ public class WorkflowVentilationServiceImpl implements WorkflowVentilationServic
     if (totalPayments.compareTo(invoice.getInTaxTotal()) > 0) {
       throw new AxelorException(
           invoice,
-          TraceBackRepository.TYPE_FUNCTIONNAL,
+          TraceBackRepository.CATEGORY_INCONSISTENCY,
           I18n.get(IExceptionMessage.AMOUNT_ADVANCE_PAYMENTS_TOO_HIGH));
     }
   }

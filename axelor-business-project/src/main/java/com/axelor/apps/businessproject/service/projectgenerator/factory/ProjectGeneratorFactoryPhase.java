@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -28,6 +28,7 @@ import com.axelor.apps.sale.db.SaleOrder;
 import com.axelor.apps.sale.db.SaleOrderLine;
 import com.axelor.apps.sale.db.repo.SaleOrderLineRepository;
 import com.axelor.apps.tool.StringTool;
+import com.axelor.exception.AxelorException;
 import com.axelor.meta.schema.actions.ActionView;
 import com.axelor.meta.schema.actions.ActionView.ActionViewBuilder;
 import com.google.inject.Inject;
@@ -59,38 +60,39 @@ public class ProjectGeneratorFactoryPhase implements ProjectGeneratorFactory {
   }
 
   @Override
-  @Transactional
   public Project create(SaleOrder saleOrder) {
     Project project = projectBusinessService.generateProject(saleOrder);
     project.setIsProject(true);
     project.setIsBusinessProject(true);
-    return projectRepository.save(project);
+    return project;
   }
 
   @Override
   @Transactional
-  public ActionViewBuilder fill(Project project, SaleOrder saleOrder, LocalDateTime startDate) {
+  public ActionViewBuilder fill(Project project, SaleOrder saleOrder, LocalDateTime startDate)
+      throws AxelorException {
     List<Project> projects = new ArrayList<>();
+    projectRepository.save(project);
     for (SaleOrderLine saleOrderLine : saleOrder.getSaleOrderLineList()) {
       Product product = saleOrderLine.getProduct();
-      if (ProductRepository.PRODUCT_TYPE_SERVICE.equals(product.getProductTypeSelect())
+      if (product != null
+          && ProductRepository.PRODUCT_TYPE_SERVICE.equals(product.getProductTypeSelect())
           && saleOrderLine.getSaleSupplySelect() == SaleOrderLineRepository.SALE_SUPPLY_PRODUCE) {
         Project phase = projectBusinessService.generatePhaseProject(saleOrderLine, project);
         phase.setFromDate(startDate);
         saleOrderLineRepository.save(saleOrderLine);
         projects.add(phase);
 
-        if (!CollectionUtils.isEmpty(product.getTaskTemplateList())) {
+        if (!CollectionUtils.isEmpty(product.getTaskTemplateSet())) {
           productTaskTemplateService.convert(
-              product
-                  .getTaskTemplateList()
-                  .stream()
+              product.getTaskTemplateSet().stream()
                   .filter(template -> Objects.isNull(template.getParentTaskTemplate()))
                   .collect(Collectors.toList()),
               phase,
               null,
               startDate,
-              saleOrderLine.getQty());
+              saleOrderLine.getQty(),
+              saleOrderLine);
         }
       }
     }
@@ -98,6 +100,7 @@ public class ProjectGeneratorFactoryPhase implements ProjectGeneratorFactory {
         .model(Project.class.getName())
         .add("grid", "project-grid")
         .add("form", "project-form")
+        .param("search-filters", "project-filters")
         .domain(String.format("self.id in (%s)", StringTool.getIdListString(projects)));
   }
 }

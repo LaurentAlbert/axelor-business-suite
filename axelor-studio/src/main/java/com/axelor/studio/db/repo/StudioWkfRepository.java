@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,6 +18,7 @@
 package com.axelor.studio.db.repo;
 
 import com.axelor.studio.db.Wkf;
+import com.axelor.studio.db.WkfNode;
 import com.axelor.studio.service.wkf.WkfService;
 import com.google.inject.Inject;
 
@@ -35,5 +36,17 @@ public class StudioWkfRepository extends WkfRepository {
     wkfService.clearWkf(wkf);
 
     super.remove(wkf);
+  }
+
+  @Override
+  public Wkf copy(Wkf wkf, boolean deep) {
+
+    wkf = super.copy(wkf, deep);
+    for (WkfNode node : wkf.getNodes()) {
+      node.setIsGenerateMenu(false);
+      node.setMenuBuilder(null);
+    }
+
+    return wkf;
   }
 }

@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -21,14 +21,20 @@ import com.axelor.apps.base.service.administration.SequenceService;
 import com.axelor.apps.base.service.app.AppBaseService;
 import com.axelor.apps.sale.db.SaleOrder;
 import com.axelor.apps.sale.db.SaleOrderLine;
+import com.axelor.apps.sale.service.app.AppSaleService;
+import com.axelor.apps.sale.service.saleorder.SaleOrderComputeService;
 import com.axelor.apps.sale.service.saleorder.SaleOrderLineService;
 import com.axelor.apps.sale.service.saleorder.SaleOrderMarginService;
 import com.axelor.exception.AxelorException;
 import com.axelor.inject.Beans;
 import com.google.common.base.Strings;
+import com.google.inject.Inject;
+import java.math.BigDecimal;
 import javax.persistence.PersistenceException;
 
 public class SaleOrderManagementRepository extends SaleOrderRepository {
+
+  @Inject SaleOrderComputeService saleOrderComputeService;
 
   @Override
   public SaleOrder copy(SaleOrder entity, boolean deep) {
@@ -39,7 +45,7 @@ public class SaleOrderManagementRepository extends SaleOrderRepository {
     copy.setSaleOrderSeq(null);
     copy.clearBatchSet();
     copy.setImportId(null);
-    copy.setCreationDate(Beans.get(AppBaseService.class).getTodayDate());
+    copy.setCreationDate(Beans.get(AppBaseService.class).getTodayDate(entity.getCompany()));
     copy.setConfirmationDateTime(null);
     copy.setConfirmedByUser(null);
     copy.setOrderDate(null);
@@ -51,10 +57,17 @@ public class SaleOrderManagementRepository extends SaleOrderRepository {
     copy.setEndOfValidityDate(null);
     copy.setDeliveryDate(null);
     copy.setOrderBeingEdited(false);
+    if (copy.getAdvancePaymentAmountNeeded().compareTo(copy.getAdvanceTotal()) <= 0) {
+      copy.setAdvancePaymentAmountNeeded(BigDecimal.ZERO);
+      copy.setAdvancePaymentNeeded(false);
+      copy.clearAdvancePaymentList();
+    }
 
-    for (SaleOrderLine saleOrderLine : copy.getSaleOrderLineList()) {
-      saleOrderLine.setDesiredDelivDate(null);
-      saleOrderLine.setEstimatedDelivDate(null);
+    if (copy.getSaleOrderLineList() != null) {
+      for (SaleOrderLine saleOrderLine : copy.getSaleOrderLineList()) {
+        saleOrderLine.setDesiredDelivDate(null);
+        saleOrderLine.setEstimatedDelivDate(null);
+      }
     }
 
     return copy;
@@ -63,6 +76,11 @@ public class SaleOrderManagementRepository extends SaleOrderRepository {
   @Override
   public SaleOrder save(SaleOrder saleOrder) {
     try {
+      if (Beans.get(AppSaleService.class).getAppSale().getEnablePackManagement()) {
+        saleOrderComputeService.computePackTotal(saleOrder);
+      } else {
+        saleOrderComputeService.resetPackTotal(saleOrder);
+      }
       computeSeq(saleOrder);
       computeFullName(saleOrder);
       computeSubMargin(saleOrder);
@@ -92,10 +110,13 @@ public class SaleOrderManagementRepository extends SaleOrderRepository {
 
   public void computeFullName(SaleOrder saleOrder) {
     try {
-      if (!Strings.isNullOrEmpty(saleOrder.getSaleOrderSeq()))
-        saleOrder.setFullName(
-            saleOrder.getSaleOrderSeq() + "-" + saleOrder.getClientPartner().getName());
-      else saleOrder.setFullName(saleOrder.getClientPartner().getName());
+      if (saleOrder.getClientPartner() != null) {
+        String fullName = saleOrder.getClientPartner().getName();
+        if (!Strings.isNullOrEmpty(saleOrder.getSaleOrderSeq())) {
+          fullName = saleOrder.getSaleOrderSeq() + "-" + fullName;
+        }
+        saleOrder.setFullName(fullName);
+      }
     } catch (Exception e) {
       throw new PersistenceException(e.getLocalizedMessage());
     }

@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -210,8 +210,7 @@ public class AppServiceImpl implements AppService {
         config.getAbsolutePath(),
         data.getAbsolutePath());
 
-    try {
-      Scanner scanner = new Scanner(config);
+    try (Scanner scanner = new Scanner(config)) {
       Importer importer = null;
       while (scanner.hasNextLine()) {
         String str = scanner.nextLine();
@@ -564,5 +563,31 @@ public class AppServiceImpl implements AppService {
     for (App app : apps) {
       importRoles(app);
     }
+  }
+
+  @Override
+  public String getDataExportDir() throws AxelorException {
+    String appSettingsPath = AppSettings.get().get("data.export.dir");
+    if (appSettingsPath == null || appSettingsPath.isEmpty()) {
+      throw new AxelorException(
+          TraceBackRepository.CATEGORY_CONFIGURATION_ERROR,
+          I18n.get(IExceptionMessages.DATA_EXPORT_DIR_ERROR));
+    }
+    return !appSettingsPath.endsWith(File.separator)
+        ? appSettingsPath + File.separator
+        : appSettingsPath;
+  }
+
+  @Override
+  public String getFileUploadDir() throws AxelorException {
+    String appSettingsPath = AppSettings.get().get("file.upload.dir");
+    if (appSettingsPath == null || appSettingsPath.isEmpty()) {
+      throw new AxelorException(
+          TraceBackRepository.CATEGORY_CONFIGURATION_ERROR,
+          I18n.get(IExceptionMessages.FILE_UPLOAD_DIR_ERROR));
+    }
+    return !appSettingsPath.endsWith(File.separator)
+        ? appSettingsPath + File.separator
+        : appSettingsPath;
   }
 }

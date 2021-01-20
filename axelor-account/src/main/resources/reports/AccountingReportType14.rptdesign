@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <report xmlns="http://www.eclipse.org/birt/2005/design" version="3.2.23" id="1">
-    <property name="createdBy">Eclipse BIRT Designer Version 4.7.0.v201706222054</property>
+    <property name="createdBy">Eclipse BIRT Designer Version 4.4.2.v201410272105 Build &lt;4.4.2.v20150217-1805></property>
     <list-property name="propertyBindings">
         <structure>
             <property name="name">odaURL</property>
@@ -44,7 +44,7 @@
             <property name="dataType">string</property>
             <property name="distinct">true</property>
             <simple-property-list name="defaultValue">
-                <value type="constant">jdbc:postgresql://localhost:5432/axelor-business-suite</value>
+                <value type="constant">jdbc:postgresql://localhost:5432/axelor-open-suite</value>
             </simple-property-list>
             <list-property name="selectionList"/>
             <property name="paramType">simple</property>
@@ -100,7 +100,7 @@
                 </ex-property>
             </list-property>
             <property name="odaDriverClass">org.postgresql.Driver</property>
-            <property name="odaURL">jdbc:postgresql://localhost:5432/axelor-business-suite</property>
+            <property name="odaURL">jdbc:postgresql://localhost:5432/axelor-open-suite</property>
             <property name="odaUser">axelor</property>
         </oda-data-source>
     </data-sources>
@@ -363,6 +363,12 @@ MoveLine.date_val <= AccountingReport.date_val AND Move.company = AccountingRepo
 (PartnerSet.partner_set IS NULL OR PartnerSet.partner_set = MoveLine.partner) AND 
 Move.ignore_in_accounting_ok = false AND 
 (Move.status_select = 3 OR Move.status_select = 2)
+AND (AccountingReport.display_closing_accounting_moves is true 
+	OR(AccountingReport.display_closing_accounting_moves is false 
+		AND (Move.functional_origin_select IS NULL OR Move.functional_origin_select != 2)))
+AND (AccountingReport.display_opening_accounting_moves is true 
+	OR(AccountingReport.display_opening_accounting_moves is false 
+		AND (Move.functional_origin_select IS NULL OR Move.functional_origin_select != 1)))
 ]]></xml-property>
         </oda-data-set>
         <oda-data-set extensionID="org.eclipse.birt.report.data.oda.jdbc.JdbcSelectDataSet" name="AccountingReportDS" id="489">
@@ -624,6 +630,10 @@ left outer join public.base_currency as Currency on (AccountingReport.currency =
                         </cell>
                         <cell id="3122">
                             <data id="3208">
+                                <structure name="dateTimeFormat">
+                                    <property name="category">Short Date</property>
+                                    <property name="pattern">Short Date</property>
+                                </structure>
                                 <property name="resultSetColumn">ReportDateEdition</property>
                             </data>
                         </cell>
@@ -826,7 +836,7 @@ left outer join public.base_currency as Currency on (AccountingReport.currency =
                     <label id="520">
                         <property name="fontWeight">bold</property>
                         <property name="textAlign">right</property>
-                        <text-property name="text">PERIODE :</text-property>
+                        <text-property name="text">PERIODE : </text-property>
                     </label>
                 </cell>
                 <cell id="515">
@@ -844,7 +854,7 @@ left outer join public.base_currency as Currency on (AccountingReport.currency =
                     <label id="521">
                         <property name="fontWeight">bold</property>
                         <property name="textAlign">right</property>
-                        <text-property name="text">DU :</text-property>
+                        <text-property name="text">DU : </text-property>
                     </label>
                 </cell>
                 <cell id="516">
@@ -867,7 +877,7 @@ left outer join public.base_currency as Currency on (AccountingReport.currency =
                     <label id="522">
                         <property name="fontWeight">bold</property>
                         <property name="textAlign">right</property>
-                        <text-property name="text">AU :</text-property>
+                        <text-property name="text">AU : </text-property>
                     </label>
                 </cell>
                 <cell id="548">

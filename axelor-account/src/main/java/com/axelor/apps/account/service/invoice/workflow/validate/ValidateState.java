@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -72,6 +72,16 @@ public class ValidateState extends WorkflowInvoice {
   @Override
   public void process() throws AxelorException {
 
+    if (invoice.getAddress() == null
+        && (invoice.getOperationTypeSelect() == InvoiceRepository.OPERATION_TYPE_CLIENT_SALE
+            || invoice.getOperationTypeSelect()
+                == InvoiceRepository.OPERATION_TYPE_CLIENT_REFUND)) {
+      throw new AxelorException(
+          TraceBackRepository.CATEGORY_MISSING_FIELD,
+          I18n.get(IExceptionMessage.INVOICE_GENERATOR_5),
+          I18n.get(com.axelor.apps.base.exceptions.IExceptionMessage.EXCEPTION));
+    }
+
     if (invoice.getPaymentMode() != null) {
       if ((InvoiceToolService.isOutPayment(invoice)
               && (invoice.getPaymentMode().getInOutSelect() == PaymentModeRepository.IN))
@@ -90,9 +100,10 @@ public class ValidateState extends WorkflowInvoice {
           TraceBackRepository.CATEGORY_INCONSISTENCY,
           I18n.get(IExceptionMessage.INVOICE_VALIDATE_BLOCKING));
     }
+
     invoice.setStatusSelect(InvoiceRepository.STATUS_VALIDATED);
     invoice.setValidatedByUser(userService.getUser());
-    invoice.setValidatedDate(appBaseService.getTodayDate());
+    invoice.setValidatedDate(appBaseService.getTodayDate(invoice.getCompany()));
     if (invoice.getPartnerAccount() == null) {
       invoice.setPartnerAccount(invoiceService.getPartnerAccount(invoice));
     }
@@ -100,7 +111,8 @@ public class ValidateState extends WorkflowInvoice {
       invoice.setJournal(invoiceService.getJournal(invoice));
     }
 
-    if (invoice.getOperationTypeSelect() == InvoiceRepository.OPERATION_TYPE_SUPPLIER_PURCHASE
+    if ((invoice.getOperationTypeSelect() == InvoiceRepository.OPERATION_TYPE_SUPPLIER_PURCHASE
+            || invoice.getOperationTypeSelect() == InvoiceRepository.OPERATION_TYPE_SUPPLIER_REFUND)
         && appAccountService.isApp("budget")) {
       if (!appAccountService.getAppBudget().getManageMultiBudget()) {
         this.generateBudgetDistribution(invoice);

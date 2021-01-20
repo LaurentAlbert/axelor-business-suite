@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -56,4 +56,6 @@ public interface IExceptionMessage {
       "Please set the email template to send" /*)*/;
   static final String INVALID_MODEL_TEMPLATE_EMAIL = /*$$(*/
       "The email template model (%s) is different than the entity generating the email (%s)" /*)*/;
+
+  String SEND_EMAIL_EXCEPTION = /*$$(*/ "Error when sending email: %s" /*)*/;
 }

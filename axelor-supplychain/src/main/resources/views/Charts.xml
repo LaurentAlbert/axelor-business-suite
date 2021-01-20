@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <object-views xmlns="http://axelor.com/xml/ns/object-views"
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://axelor.com/xml/ns/object-views http://axelor.com/xml/ns/object-views/object-views_5.0.xsd">
+	xsi:schemaLocation="http://axelor.com/xml/ns/object-views http://axelor.com/xml/ns/object-views/object-views_5.3.xsd">
 	
-	<chart name="chart.nbr.product.per.family" title="Number of Product per Family">
+	<chart name="chart.nbr.product.per.family" title="Number of Product per Accounting Family">
 		<dataset type="sql">
 			SELECT
 				COUNT(_product.id) AS _num_prod,
@@ -14,12 +14,13 @@
 				base_product_family AS _family
 			ON
 				_family.id = _product.product_family
+			WHERE dtype = 'Product'
 			GROUP BY
 				_prod_family
 			ORDER BY
 				_prod_family
 		</dataset>
-		<category key="_prod_family" type="text" title="Product Family"/>
+		<category key="_prod_family" type="text" title="Product Accounting Family"/>
 		<series key="_num_prod" type="bar" title="Products"/>
 	</chart>
 		
@@ -34,6 +35,7 @@
 			  base_product_category AS _category
 			ON
 			  _category.id = _product.product_category
+			WHERE dtype = 'Product'
 			GROUP BY
 			  _prod_category
 			ORDER BY
@@ -57,6 +59,7 @@
 			  meta_select_item AS _item
 			  ON _item.select_id = selection.id
 			  AND _item.value = self.product_type_select
+			WHERE dtype = 'Product'
 			GROUP BY
 			  _type
 		</dataset>
@@ -83,7 +86,7 @@
 					FROM
 						base_product AS self
 					WHERE
-						self.start_date BETWEEN DATE(:fromDate) AND DATE(:toDate)
+						self.start_date BETWEEN DATE(:fromDate) AND DATE(:toDate) AND dtype = 'Product'
 					GROUP BY
 					  _month)
 				UNION ALL
@@ -94,7 +97,7 @@
 				  	FROM
 				    	base_product AS self
 				  	WHERE
-				    	self.end_date BETWEEN DATE(:fromDate)  AND DATE(:toDate)
+				    	self.end_date BETWEEN DATE(:fromDate)  AND DATE(:toDate) AND dtype = 'Product'
 				  	GROUP BY
 				    	_month)
 				) prod_status
@@ -105,5 +108,11 @@
 		<series key="_num_prod" groupBy="_label" type="bar" title="Products"/>
 		<config name="xFormat" value="MM-YYYY"/>
 	</chart>
+  
+  <chart name="chart.projected.stock" title="Projected stock">
+    <dataset type="rpc">com.axelor.apps.supplychain.web.ProjectedStockController:showChartProjectedStock</dataset>
+    <category key="name" type="date" title="Date"/>
+    <series key="cumulativeQty" type="line" title="Cumulative qty"/>
+ </chart>
 
 </object-views>

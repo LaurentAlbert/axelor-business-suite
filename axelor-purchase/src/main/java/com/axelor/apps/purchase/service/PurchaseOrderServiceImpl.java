@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -31,12 +31,13 @@ import com.axelor.apps.base.db.repo.PartnerRepository;
 import com.axelor.apps.base.db.repo.ProductRepository;
 import com.axelor.apps.base.db.repo.SequenceRepository;
 import com.axelor.apps.base.service.BlockingService;
+import com.axelor.apps.base.service.CurrencyService;
+import com.axelor.apps.base.service.ProductCompanyService;
 import com.axelor.apps.base.service.ProductService;
 import com.axelor.apps.base.service.ShippingCoefService;
 import com.axelor.apps.base.service.TradingNameService;
 import com.axelor.apps.base.service.UnitConversionService;
 import com.axelor.apps.base.service.administration.SequenceService;
-import com.axelor.apps.purchase.db.IPurchaseOrder;
 import com.axelor.apps.purchase.db.PurchaseOrder;
 import com.axelor.apps.purchase.db.PurchaseOrderLine;
 import com.axelor.apps.purchase.db.PurchaseOrderLineTax;
@@ -44,6 +45,7 @@ import com.axelor.apps.purchase.db.repo.PurchaseOrderRepository;
 import com.axelor.apps.purchase.exception.IExceptionMessage;
 import com.axelor.apps.purchase.report.IReport;
 import com.axelor.apps.purchase.service.app.AppPurchaseService;
+import com.axelor.apps.purchase.service.print.PurchaseOrderPrintService;
 import com.axelor.apps.report.engine.ReportSettings;
 import com.axelor.auth.AuthUtils;
 import com.axelor.auth.db.User;
@@ -76,6 +78,8 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
 
   @Inject protected PurchaseOrderRepository purchaseOrderRepo;
 
+  @Inject protected ProductCompanyService productCompanyService;
+
   @Override
   public PurchaseOrder _computePurchaseOrderLines(PurchaseOrder purchaseOrder)
       throws AxelorException {
@@ -95,7 +99,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
   }
 
   @Override
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public PurchaseOrder computePurchaseOrder(PurchaseOrder purchaseOrder) throws AxelorException {
 
     this.initPurchaseOrderLineTax(purchaseOrder);
@@ -223,7 +227,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
         Beans.get(TradingNameService.class).getDefaultPrintingSettings(null, company));
 
     purchaseOrder.setPurchaseOrderSeq(this.getSequence(company));
-    purchaseOrder.setStatusSelect(IPurchaseOrder.STATUS_DRAFT);
+    purchaseOrder.setStatusSelect(PurchaseOrderRepository.STATUS_DRAFT);
     purchaseOrder.setSupplierPartner(supplierPartner);
 
     return purchaseOrder;
@@ -243,7 +247,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
   }
 
   @Override
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional
   public Partner validateSupplier(PurchaseOrder purchaseOrder) {
 
     Partner supplierPartner = partnerRepo.find(purchaseOrder.getSupplierPartner().getId());
@@ -273,16 +277,25 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
 
     ReportFactory.createReport(IReport.PURCHASE_ORDER, title + "-${date}")
         .addParam("PurchaseOrderId", purchaseOrder.getId())
+        .addParam(
+            "PurchaseOrderLineQuery",
+            Beans.get(PurchaseOrderPrintService.class)
+                .getPurchaseOrderLineDataSetQuery(purchaseOrder.getId()))
         .addParam("Locale", language)
+        .addParam(
+            "Timezone",
+            purchaseOrder.getCompany() != null ? purchaseOrder.getCompany().getTimezone() : null)
+        .addParam("HeaderHeight", purchaseOrder.getPrintingSettings().getPdfHeaderHeight())
+        .addParam("FooterHeight", purchaseOrder.getPrintingSettings().getPdfFooterHeight())
         .toAttach(purchaseOrder)
         .generate()
         .getFileLink();
   }
 
   @Override
-  @Transactional(rollbackOn = {AxelorException.class, RuntimeException.class})
+  @Transactional(rollbackOn = {Exception.class})
   public void requestPurchaseOrder(PurchaseOrder purchaseOrder) throws AxelorException {
-    purchaseOrder.setStatusSelect(IPurchaseOrder.STATUS_REQUESTED);
+    purchaseOrder.setStatusSelect(PurchaseOrderRepository.STATUS_REQUESTED);
     Partner partner = purchaseOrder.getSupplierPartner();
     Company company = purchaseOrder.getCompany();
     Blocking blocking =
@@ -293,7 +306,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
       String reason =
           blocking.getBlockingReason() != null ? blocking.getBlockingReason().getName() : "";
       throw new AxelorException(
-          TraceBackRepository.TYPE_FUNCTIONNAL,
+          TraceBackRepository.CATEGORY_INCONSISTENCY,
           I18n.get(IExceptionMessage.SUPPLIER_BLOCKED) + " " + reason,
           partner);
     }
@@ -308,7 +321,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
   }
 
   @Override
-  @Transactional
+  @Transactional(rollbackOn = {Exception.class})
   public PurchaseOrder mergePurchaseOrders(
       List<PurchaseOrder> purchaseOrderList,
       Currency currency,
@@ -344,7 +357,7 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
             null,
             numSeq,
             externalRef,
-            LocalDate.now(),
+            appPurchaseService.getTodayDate(company),
             priceList,
             supplierPartner,
             tradingName);
@@ -390,19 +403,36 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
   }
 
   @Override
-  @Transactional(rollbackOn = {AxelorException.class, RuntimeException.class})
+  @Transactional(rollbackOn = {Exception.class})
   public void updateCostPrice(PurchaseOrder purchaseOrder) throws AxelorException {
     if (purchaseOrder.getPurchaseOrderLineList() != null) {
+      CurrencyService currencyService = Beans.get(CurrencyService.class);
       for (PurchaseOrderLine purchaseOrderLine : purchaseOrder.getPurchaseOrderLineList()) {
         Product product = purchaseOrderLine.getProduct();
         if (product != null) {
-          product.setPurchasePrice(
-              purchaseOrder.getInAti()
+          BigDecimal lastPurchasePrice =
+              (Boolean) productCompanyService.get(product, "inAti", purchaseOrder.getCompany())
                   ? purchaseOrderLine.getInTaxPrice()
-                  : purchaseOrderLine.getPrice());
-          if (product.getDefShipCoefByPartner()) {
+                  : purchaseOrderLine.getPrice();
+          lastPurchasePrice =
+              currencyService.getAmountCurrencyConvertedAtDate(
+                  purchaseOrder.getCurrency(),
+                  purchaseOrder.getCompany().getCurrency(),
+                  lastPurchasePrice,
+                  currencyService.getDateToConvert(null));
+
+          productCompanyService.set(
+              product, "lastPurchasePrice", lastPurchasePrice, purchaseOrder.getCompany());
+          if ((Boolean)
+              productCompanyService.get(
+                  product, "defShipCoefByPartner", purchaseOrder.getCompany())) {
             Unit productPurchaseUnit =
-                product.getPurchasesUnit() != null ? product.getPurchasesUnit() : product.getUnit();
+                (Unit)
+                    productCompanyService.get(product, "purchasesUnit", purchaseOrder.getCompany());
+            productPurchaseUnit =
+                productPurchaseUnit != null
+                    ? productPurchaseUnit
+                    : (Unit) productCompanyService.get(product, "unit", purchaseOrder.getCompany());
             BigDecimal convertedQty =
                 Beans.get(UnitConversionService.class)
                     .convert(
@@ -419,57 +449,24 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
                         purchaseOrder.getCompany(),
                         convertedQty);
             if (shippingCoef.compareTo(BigDecimal.ZERO) != 0) {
-              product.setShippingCoef(shippingCoef);
+              productCompanyService.set(
+                  product, "shippingCoef", shippingCoef, purchaseOrder.getCompany());
             }
           }
-          if (product.getCostTypeSelect() == ProductRepository.COST_TYPE_LAST_PURCHASE_PRICE) {
-            product.setCostPrice(
-                purchaseOrder.getInAti()
-                    ? purchaseOrderLine.getInTaxPrice()
-                    : purchaseOrderLine.getPrice());
-            if (product.getAutoUpdateSalePrice()) {
-              Beans.get(ProductService.class).updateSalePrice(product);
+          if ((Integer)
+                  productCompanyService.get(product, "costTypeSelect", purchaseOrder.getCompany())
+              == ProductRepository.COST_TYPE_LAST_PURCHASE_PRICE) {
+            productCompanyService.set(
+                product, "costPrice", lastPurchasePrice, purchaseOrder.getCompany());
+            if ((Boolean)
+                productCompanyService.get(
+                    product, "autoUpdateSalePrice", purchaseOrder.getCompany())) {
+              Beans.get(ProductService.class).updateSalePrice(product, purchaseOrder.getCompany());
             }
           }
         }
       }
       purchaseOrderRepo.save(purchaseOrder);
     }
-  }
-
-  @Override
-  @Transactional
-  public void draftPurchaseOrder(PurchaseOrder purchaseOrder) {
-
-    purchaseOrder.setStatusSelect(IPurchaseOrder.STATUS_DRAFT);
-    purchaseOrderRepo.save(purchaseOrder);
-  }
-
-  @Override
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
-  public void validatePurchaseOrder(PurchaseOrder purchaseOrder) throws AxelorException {
-    computePurchaseOrder(purchaseOrder);
-
-    purchaseOrder.setStatusSelect(IPurchaseOrder.STATUS_VALIDATED);
-    purchaseOrder.setValidationDate(appPurchaseService.getTodayDate());
-    purchaseOrder.setValidatedByUser(AuthUtils.getUser());
-
-    purchaseOrder.setSupplierPartner(validateSupplier(purchaseOrder));
-
-    updateCostPrice(purchaseOrder);
-  }
-
-  @Override
-  @Transactional
-  public void finishPurchaseOrder(PurchaseOrder purchaseOrder) {
-    purchaseOrder.setStatusSelect(IPurchaseOrder.STATUS_FINISHED);
-    purchaseOrderRepo.save(purchaseOrder);
-  }
-
-  @Override
-  @Transactional
-  public void cancelPurchaseOrder(PurchaseOrder purchaseOrder) {
-    purchaseOrder.setStatusSelect(IPurchaseOrder.STATUS_CANCELED);
-    purchaseOrderRepo.save(purchaseOrder);
   }
 }

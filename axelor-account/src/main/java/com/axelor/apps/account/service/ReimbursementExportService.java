@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -93,7 +93,6 @@ public class ReimbursementExportService {
     this.appAccountService = appAccountService;
   }
 
-  /** @param reimbursementExport */
   public void fillMoveLineSet(
       Reimbursement reimbursement, List<MoveLine> moveLineList, BigDecimal total) {
 
@@ -111,11 +110,7 @@ public class ReimbursementExportService {
     log.debug("End fillMoveLineSet");
   }
 
-  /**
-   * @param reimbursementExport
-   * @throws AxelorException
-   */
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public Reimbursement runCreateReimbursement(
       List<MoveLine> moveLineList, Company company, Partner partner) throws AxelorException {
 
@@ -151,7 +146,7 @@ public class ReimbursementExportService {
   /**
    * Fonction permettant de calculer le montant total restant à payer / à lettrer
    *
-   * @param movelineList Une liste de ligne d'écriture
+   * @param moveLineList Une liste de ligne d'écriture
    * @return Le montant total restant à payer / à lettrer
    */
   public BigDecimal getTotalAmountRemaining(List<MoveLine> moveLineList) {
@@ -168,7 +163,7 @@ public class ReimbursementExportService {
   /**
    * Methode permettant de créer l'écriture de remboursement
    *
-   * @param reimbursementExport Un objet d'export des prélèvements
+   * @param reimbursement Un objet d'export des prélèvements
    * @throws AxelorException
    */
   public void createReimbursementMove(Reimbursement reimbursement, Company company)
@@ -212,7 +207,7 @@ public class ReimbursementExportService {
                   moveLine.getAccount(),
                   amountRemaining,
                   true,
-                  appAccountService.getTodayDate(),
+                  appAccountService.getTodayDate(company),
                   seq,
                   reimbursement.getRef(),
                   reimbursement.getDescription());
@@ -239,7 +234,7 @@ public class ReimbursementExportService {
               accountConfig.getReimbursementAccount(),
               reimbursement.getAmountReimbursed(),
               false,
-              appAccountService.getTodayDate(),
+              appAccountService.getTodayDate(company),
               seq,
               reimbursement.getRef(),
               reimbursement.getDescription());
@@ -277,7 +272,7 @@ public class ReimbursementExportService {
     }
   }
 
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public void reimburse(Reimbursement reimbursement, Company company) throws AxelorException {
     reimbursement.setAmountReimbursed(reimbursement.getAmountToReimburse());
     this.createReimbursementMove(reimbursement, company);
@@ -290,7 +285,6 @@ public class ReimbursementExportService {
    *
    * @param partner Un tiers
    * @param company Une société
-   * @param reimbursementExport Un export des remboursement
    * @return Le remboursmeent créé
    * @throws AxelorException
    */
@@ -326,7 +320,7 @@ public class ReimbursementExportService {
    *
    * @param reimbursement Un remboursement
    */
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional
   public void updatePartnerCurrentRIB(Reimbursement reimbursement) {
     BankDetails bankDetails = reimbursement.getBankDetails();
     Partner partner = reimbursement.getPartner();
@@ -508,11 +502,11 @@ public class ReimbursementExportService {
    *
    * @param partner Un tiers
    * @param company Une société
-   * @param moveLine Un trop-perçu
+   * @param moveLineList Une liste de trop-perçu
    * @throws AxelorException
    */
   @SuppressWarnings("unchecked")
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public void createReimbursementInvoice(
       Partner partner, Company company, List<? extends MoveLine> moveLineList)
       throws AxelorException {
@@ -546,7 +540,7 @@ public class ReimbursementExportService {
    * @param invoice Une facture
    * @throws AxelorException
    */
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public void createReimbursementInvoice(Invoice invoice) throws AxelorException {
     Company company = invoice.getCompany();
     Partner partner = invoice.getPartner();

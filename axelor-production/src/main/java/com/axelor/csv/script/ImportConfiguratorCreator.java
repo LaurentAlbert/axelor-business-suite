@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -19,9 +19,13 @@ package com.axelor.csv.script;
 
 import com.axelor.apps.sale.service.configurator.ConfiguratorCreatorImportService;
 import com.axelor.exception.AxelorException;
+import com.axelor.exception.db.repo.TraceBackRepository;
+import com.axelor.meta.MetaScanner;
 import com.google.inject.Inject;
 import com.google.inject.persist.Transactional;
+import java.io.File;
 import java.io.IOException;
+import java.net.URL;
 import java.util.Map;
 
 public class ImportConfiguratorCreator {
@@ -31,8 +35,17 @@ public class ImportConfiguratorCreator {
   @Transactional
   public Object importConfiguratorCreator(Object bean, Map values)
       throws AxelorException, IOException {
-    configuratorCreatorImportService.importConfiguratorCreators(
-        "./production_configuratorCreator.xml");
+    String path = String.valueOf(values.get("path"));
+    File dataFile = new File(path);
+    URL url =
+        MetaScanner.findAll("axelor-production", dataFile.getParent(), dataFile.getName()).stream()
+            .findAny()
+            .orElseThrow(
+                () ->
+                    new AxelorException(
+                        TraceBackRepository.CATEGORY_INCONSISTENCY,
+                        "Error when importing configurator creators demo data."));
+    configuratorCreatorImportService.importConfiguratorCreators(url.openStream());
     return null;
   }
 }

@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,6 +18,7 @@
 package com.axelor.apps.contract.web;
 
 import com.axelor.apps.account.db.Invoice;
+import com.axelor.apps.base.db.Company;
 import com.axelor.apps.base.db.Product;
 import com.axelor.apps.base.service.app.AppBaseService;
 import com.axelor.apps.contract.db.Contract;
@@ -49,7 +50,8 @@ public class ContractController {
         Beans.get(ContractRepository.class)
             .find(request.getContext().asType(Contract.class).getId());
     try {
-      Beans.get(ContractService.class).waitingCurrentVersion(contract, getTodayDate());
+      Beans.get(ContractService.class)
+          .waitingCurrentVersion(contract, getTodayDate(contract.getCompany()));
       response.setReload(true);
     } catch (Exception e) {
       TraceBackService.trace(response, e);
@@ -62,7 +64,8 @@ public class ContractController {
             .find(request.getContext().asType(Contract.class).getId());
     try {
       Invoice invoice =
-          Beans.get(ContractService.class).ongoingCurrentVersion(contract, getTodayDate());
+          Beans.get(ContractService.class)
+              .ongoingCurrentVersion(contract, getTodayDate(contract.getCompany()));
       if (invoice == null) {
         response.setReload(true);
       } else {
@@ -71,6 +74,7 @@ public class ContractController {
                 .model(Invoice.class.getName())
                 .add("form", "invoice-form")
                 .add("grid", "invoice-grid")
+                .param("search-filters", "customer-invoices-filters")
                 .param("forceTitle", "true")
                 .context("_showRecord", invoice.getId().toString())
                 .map());
@@ -92,6 +96,7 @@ public class ContractController {
               .model(Invoice.class.getName())
               .add("form", "invoice-form")
               .add("grid", "invoice-grid")
+              .param("search-filters", "customer-invoices-filters")
               .param("forceTitle", "true")
               .context("_showRecord", invoice.getId().toString())
               .map());
@@ -114,12 +119,27 @@ public class ContractController {
     }
   }
 
+  public void close(ActionRequest request, ActionResponse response) {
+    Contract contract =
+        Beans.get(ContractRepository.class)
+            .find(request.getContext().asType(Contract.class).getId());
+
+    ContractService service = Beans.get(ContractService.class);
+    try {
+      service.checkCanTerminateContract(contract);
+      service.close(contract, contract.getTerminatedDate());
+      response.setReload(true);
+    } catch (Exception e) {
+      TraceBackService.trace(response, e);
+    }
+  }
+
   public void renew(ActionRequest request, ActionResponse response) {
     Contract contract =
         Beans.get(ContractRepository.class)
             .find(request.getContext().asType(Contract.class).getId());
     try {
-      Beans.get(ContractService.class).renewContract(contract, getTodayDate());
+      Beans.get(ContractService.class).renewContract(contract, getTodayDate(contract.getCompany()));
       response.setReload(true);
     } catch (Exception e) {
       TraceBackService.trace(response, e);
@@ -144,10 +164,6 @@ public class ContractController {
         });
 
     response.setReload(true);
-  }
-
-  private LocalDate getToDay() {
-    return Beans.get(AppBaseService.class).getTodayDate();
   }
 
   public void saveNextVersion(ActionRequest request, ActionResponse response) {
@@ -219,8 +235,8 @@ public class ContractController {
     }
   }
 
-  private LocalDate getTodayDate() {
-    return Beans.get(AppBaseService.class).getTodayDate();
+  private LocalDate getTodayDate(Company company) {
+    return Beans.get(AppBaseService.class).getTodayDate(company);
   }
 
   public void isValid(ActionRequest request, ActionResponse response) {

@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -33,7 +33,6 @@ import com.axelor.rpc.ActionRequest;
 import com.axelor.rpc.ActionResponse;
 import com.axelor.rpc.Context;
 import com.google.common.base.Joiner;
-import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
@@ -48,18 +47,6 @@ import org.slf4j.LoggerFactory;
 public class StockLocationController {
 
   private final Logger logger = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
-
-  private StockLocationRepository stockLocationRepo;
-
-  private StockLocationService stockLocationService;
-
-  @Inject
-  public StockLocationController(
-      StockLocationRepository stockLocationRepo, StockLocationService stockLocationService) {
-    this.stockLocationRepo = stockLocationRepo;
-    this.stockLocationService = stockLocationService;
-  }
-
   /**
    * Method that generate inventory as a pdf
    *
@@ -76,13 +63,14 @@ public class StockLocationController {
     LinkedHashMap<String, Object> stockLocationMap =
         (LinkedHashMap<String, Object>) context.get("_stockLocation");
     Integer stockLocationId = (Integer) stockLocationMap.get("id");
+    StockLocationService stockLocationService = Beans.get(StockLocationService.class);
+    StockLocationRepository stockLocationRepository = Beans.get(StockLocationRepository.class);
 
     StockLocation stockLocation =
-        stockLocationId != null
-            ? Beans.get(StockLocationRepository.class).find(new Long(stockLocationId))
-            : null;
+        stockLocationId != null ? stockLocationRepository.find(new Long(stockLocationId)) : null;
     String locationIds = "";
 
+    String printType = (String) context.get("printingType");
     String exportType = (String) context.get("exportTypeSelect");
 
     @SuppressWarnings("unchecked")
@@ -90,7 +78,8 @@ public class StockLocationController {
     if (lstSelectedLocations != null) {
       for (Integer it : lstSelectedLocations) {
         Set<Long> idSet =
-            stockLocationService.getContentStockLocationIds(stockLocationRepo.find(new Long(it)));
+            stockLocationService.getContentStockLocationIds(
+                stockLocationRepository.find(new Long(it)));
         if (!idSet.isEmpty()) {
           locationIds += Joiner.on(",").join(idSet) + ",";
         }
@@ -99,11 +88,11 @@ public class StockLocationController {
 
     if (!locationIds.equals("")) {
       locationIds = locationIds.substring(0, locationIds.length() - 1);
-      stockLocation = stockLocationRepo.find(new Long(lstSelectedLocations.get(0)));
+      stockLocation = stockLocationRepository.find(new Long(lstSelectedLocations.get(0)));
     } else if (stockLocation != null && stockLocation.getId() != null) {
       Set<Long> idSet =
           stockLocationService.getContentStockLocationIds(
-              stockLocationRepo.find(stockLocation.getId()));
+              stockLocationRepository.find(stockLocation.getId()));
       if (!idSet.isEmpty()) {
         locationIds = Joiner.on(",").join(idSet);
       }
@@ -120,11 +109,17 @@ public class StockLocationController {
                 : I18n.get("Stock location(s)");
       }
 
+      if (stockLocationService.isConfigMissing(stockLocation, Integer.parseInt(printType))) {
+        response.setNotify(I18n.get(IExceptionMessage.STOCK_CONFIGURATION_MISSING));
+      }
+
       String fileLink =
           ReportFactory.createReport(IReport.STOCK_LOCATION, title + "-${date}")
               .addParam("StockLocationId", locationIds)
+              .addParam("Timezone", null)
               .addParam("Locale", language)
               .addFormat(exportType)
+              .addParam("PrintType", printType)
               .generate()
               .getFileLink();
 
@@ -141,10 +136,11 @@ public class StockLocationController {
   public void setStocklocationValue(ActionRequest request, ActionResponse response) {
 
     StockLocation stockLocation = request.getContext().asType(StockLocation.class);
-
-    response.setValue(
-        "stockLocationValue",
-        Beans.get(StockLocationService.class).getStockLocationValue(stockLocation));
+    if (stockLocation.getTypeSelect() != StockLocationRepository.TYPE_VIRTUAL) {
+      response.setValue(
+          "stockLocationValue",
+          Beans.get(StockLocationService.class).getStockLocationValue(stockLocation));
+    }
   }
 
   public void openPrintWizard(ActionRequest request, ActionResponse response) {

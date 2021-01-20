@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -52,7 +52,7 @@ public class TimesheetTimerServiceImpl implements TimesheetTimerService {
     calculateDuration(timer);
   }
 
-  @Transactional(rollbackOn = {AxelorException.class, RuntimeException.class})
+  @Transactional(rollbackOn = {Exception.class})
   public void stop(TSTimer timer) throws AxelorException {
     timer.setStatusSelect(TSTimerRepository.STATUS_STOP);
     calculateDuration(timer);
@@ -60,7 +60,7 @@ public class TimesheetTimerServiceImpl implements TimesheetTimerService {
       generateTimesheetLine(timer);
     } else {
       throw new AxelorException(
-          TraceBackRepository.TYPE_FUNCTIONNAL,
+          TraceBackRepository.CATEGORY_INCONSISTENCY,
           I18n.get(IExceptionMessage.NO_TIMESHEET_CREATED),
           timer);
     }

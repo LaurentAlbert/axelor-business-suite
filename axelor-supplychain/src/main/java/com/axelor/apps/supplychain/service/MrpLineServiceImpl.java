@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -29,6 +29,7 @@ import com.axelor.apps.purchase.db.PurchaseOrder;
 import com.axelor.apps.purchase.db.PurchaseOrderLine;
 import com.axelor.apps.purchase.db.repo.PurchaseOrderRepository;
 import com.axelor.apps.purchase.service.PurchaseOrderLineService;
+import com.axelor.apps.purchase.service.PurchaseOrderService;
 import com.axelor.apps.sale.db.SaleOrderLine;
 import com.axelor.apps.stock.db.StockLocation;
 import com.axelor.apps.stock.db.StockRules;
@@ -64,7 +65,8 @@ public class MrpLineServiceImpl implements MrpLineService {
   private final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   protected AppBaseService appBaseService;
-  protected PurchaseOrderServiceSupplychainImpl purchaseOrderServiceSupplychainImpl;
+  protected PurchaseOrderSupplychainService purchaseOrderSupplychainService;
+  protected PurchaseOrderService purchaseOrderService;
   protected PurchaseOrderLineService purchaseOrderLineService;
   protected PurchaseOrderRepository purchaseOrderRepo;
   protected StockRulesService stockRulesService;
@@ -72,13 +74,15 @@ public class MrpLineServiceImpl implements MrpLineService {
   @Inject
   public MrpLineServiceImpl(
       AppBaseService appBaseService,
-      PurchaseOrderServiceSupplychainImpl purchaseOrderServiceSupplychainImpl,
+      PurchaseOrderSupplychainService purchaseOrderSupplychainService,
+      PurchaseOrderService purchaseOrderService,
       PurchaseOrderLineService purchaseOrderLineService,
       PurchaseOrderRepository purchaseOrderRepo,
       StockRulesService stockRulesService) {
 
     this.appBaseService = appBaseService;
-    this.purchaseOrderServiceSupplychainImpl = purchaseOrderServiceSupplychainImpl;
+    this.purchaseOrderSupplychainService = purchaseOrderSupplychainService;
+    this.purchaseOrderService = purchaseOrderService;
     this.purchaseOrderLineService = purchaseOrderLineService;
     this.purchaseOrderRepo = purchaseOrderRepo;
     this.stockRulesService = stockRulesService;
@@ -86,24 +90,31 @@ public class MrpLineServiceImpl implements MrpLineService {
 
   @Override
   public void generateProposal(MrpLine mrpLine) throws AxelorException {
-    generateProposal(mrpLine, null);
+    generateProposal(mrpLine, null, null, false);
   }
 
   @Override
   public void generateProposal(
-      MrpLine mrpLine, Map<Pair<Partner, LocalDate>, PurchaseOrder> purchaseOrders)
+      MrpLine mrpLine,
+      Map<Pair<Partner, LocalDate>, PurchaseOrder> purchaseOrders,
+      Map<Partner, PurchaseOrder> purchaseOrdersPerSupplier,
+      boolean isProposalsPerSupplier)
       throws AxelorException {
 
     if (mrpLine.getMrpLineType().getElementSelect()
         == MrpLineTypeRepository.ELEMENT_PURCHASE_PROPOSAL) {
 
-      this.generatePurchaseProposal(mrpLine, purchaseOrders);
+      this.generatePurchaseProposal(
+          mrpLine, purchaseOrders, purchaseOrdersPerSupplier, isProposalsPerSupplier);
     }
   }
 
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   protected void generatePurchaseProposal(
-      MrpLine mrpLine, Map<Pair<Partner, LocalDate>, PurchaseOrder> purchaseOrders)
+      MrpLine mrpLine,
+      Map<Pair<Partner, LocalDate>, PurchaseOrder> purchaseOrders,
+      Map<Partner, PurchaseOrder> purchaseOrdersPerSupplier,
+      boolean isProposalsPerSupplier)
       throws AxelorException {
 
     Product product = mrpLine.getProduct();
@@ -125,30 +136,42 @@ public class MrpLineServiceImpl implements MrpLineService {
     Pair<Partner, LocalDate> key = null;
     PurchaseOrder purchaseOrder = null;
 
-    if (purchaseOrders != null) {
-      key = Pair.of(supplierPartner, maturityDate);
-      purchaseOrder = purchaseOrders.get(key);
+    if (isProposalsPerSupplier) {
+      if (purchaseOrdersPerSupplier != null) {
+        purchaseOrder = purchaseOrdersPerSupplier.get(supplierPartner);
+      }
+    } else {
+      if (purchaseOrders != null) {
+        key = Pair.of(supplierPartner, maturityDate);
+        purchaseOrder = purchaseOrders.get(key);
+      }
     }
 
     if (purchaseOrder == null) {
       purchaseOrder =
           purchaseOrderRepo.save(
-              purchaseOrderServiceSupplychainImpl.createPurchaseOrder(
+              purchaseOrderSupplychainService.createPurchaseOrder(
                   AuthUtils.getUser(),
                   company,
                   null,
                   supplierPartner.getCurrency(),
                   maturityDate,
-                  "MRP-" + appBaseService.getTodayDate().toString(), // TODO sequence on mrp
+                  "MRP-" + appBaseService.getTodayDate(company).toString(), // TODO sequence on mrp
                   null,
                   stockLocation,
-                  appBaseService.getTodayDate(),
+                  appBaseService.getTodayDate(company),
                   Beans.get(PartnerPriceListService.class)
                       .getDefaultPriceList(supplierPartner, PriceListRepository.TYPE_PURCHASE),
                   supplierPartner,
                   null));
-      if (purchaseOrders != null) {
-        purchaseOrders.put(key, purchaseOrder);
+      if (isProposalsPerSupplier) {
+        if (purchaseOrdersPerSupplier != null) {
+          purchaseOrdersPerSupplier.put(supplierPartner, purchaseOrder);
+        }
+      } else {
+        if (purchaseOrders != null) {
+          purchaseOrders.put(key, purchaseOrder);
+        }
       }
     }
     Unit unit = product.getPurchasesUnit();
@@ -160,11 +183,13 @@ public class MrpLineServiceImpl implements MrpLineService {
           Beans.get(UnitConversionService.class)
               .convert(product.getUnit(), unit, qty, qty.scale(), product);
     }
-    purchaseOrder.addPurchaseOrderLineListItem(
+    PurchaseOrderLine poLine =
         purchaseOrderLineService.createPurchaseOrderLine(
-            purchaseOrder, product, null, null, qty, unit));
+            purchaseOrder, product, null, null, qty, unit);
+    poLine.setDesiredDelivDate(maturityDate);
+    purchaseOrder.addPurchaseOrderLineListItem(poLine);
 
-    purchaseOrderServiceSupplychainImpl.computePurchaseOrder(purchaseOrder);
+    purchaseOrderService.computePurchaseOrder(purchaseOrder);
 
     linkToOrder(mrpLine, purchaseOrder);
   }

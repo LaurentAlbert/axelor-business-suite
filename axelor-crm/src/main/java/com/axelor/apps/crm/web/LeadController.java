@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -35,7 +35,6 @@ import com.axelor.inject.Beans;
 import com.axelor.meta.schema.actions.ActionView;
 import com.axelor.rpc.ActionRequest;
 import com.axelor.rpc.ActionResponse;
-import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
@@ -49,8 +48,6 @@ import org.slf4j.LoggerFactory;
 public class LeadController {
 
   private final Logger logger = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
-
-  @Inject LeadRepository leadRepo;
 
   /**
    * Method to generate Lead as a Pdf
@@ -84,12 +81,21 @@ public class LeadController {
     if (!leadIds.equals("")) {
       String title = " ";
       if (lead.getFirstName() != null) {
-        title += lstSelectedleads == null ? "Lead " + lead.getFirstName() : "Leads";
+        title +=
+            lstSelectedleads == null
+                ? "Lead "
+                    + lead.getName()
+                    + " "
+                    + lead.getFirstName()
+                    + " - "
+                    + lead.getEnterpriseName()
+                : "Leads";
       }
 
       String fileLink =
           ReportFactory.createReport(IReport.LEAD, title + "-${date}")
               .addParam("LeadId", leadIds)
+              .addParam("Timezone", getTimezone(lead))
               .addParam("Locale", ReportSettings.getPrintingLocale(lead.getPartner()))
               .generate()
               .getFileLink();
@@ -101,6 +107,13 @@ public class LeadController {
     } else {
       response.setFlash(I18n.get(IExceptionMessage.LEAD_1));
     }
+  }
+
+  private String getTimezone(Lead lead) {
+    if (lead.getUser() == null || lead.getUser().getActiveCompany() == null) {
+      return null;
+    }
+    return lead.getUser().getActiveCompany().getTimezone();
   }
 
   public void showLeadsOnMap(ActionRequest request, ActionResponse response) {
@@ -170,7 +183,8 @@ public class LeadController {
   public void loseLead(ActionRequest request, ActionResponse response) {
     try {
       Lead lead = request.getContext().asType(Lead.class);
-      Beans.get(LeadService.class).loseLead(leadRepo.find(lead.getId()), lead.getLostReason());
+      Beans.get(LeadService.class)
+          .loseLead(Beans.get(LeadRepository.class).find(lead.getId()), lead.getLostReason());
       response.setCanClose(true);
     } catch (Exception e) {
       TraceBackService.trace(response, e);

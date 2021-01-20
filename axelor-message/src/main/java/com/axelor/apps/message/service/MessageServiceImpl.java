@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -25,6 +25,7 @@ import com.axelor.apps.message.db.repo.MessageRepository;
 import com.axelor.apps.message.exception.IExceptionMessage;
 import com.axelor.auth.AuthUtils;
 import com.axelor.db.JPA;
+import com.axelor.db.JpaSupport;
 import com.axelor.db.Model;
 import com.axelor.db.Query;
 import com.axelor.exception.AxelorException;
@@ -46,36 +47,35 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 import com.google.inject.persist.Transactional;
-import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.time.LocalDateTime;
-import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import javax.mail.MessagingException;
+import javax.persistence.LockModeType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class MessageServiceImpl implements MessageService {
+public class MessageServiceImpl extends JpaSupport implements MessageService {
+
   private final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   private MetaAttachmentRepository metaAttachmentRepository;
   protected MessageRepository messageRepository;
-
-  private ExecutorService executor = Executors.newCachedThreadPool();
+  protected SendMailQueueService sendMailQueueService;
 
   @Inject
   public MessageServiceImpl(
-      MetaAttachmentRepository metaAttachmentRepository, MessageRepository messageRepository) {
+      MetaAttachmentRepository metaAttachmentRepository,
+      MessageRepository messageRepository,
+      SendMailQueueService sendMailQueueService) {
     this.metaAttachmentRepository = metaAttachmentRepository;
     this.messageRepository = messageRepository;
+    this.sendMailQueueService = sendMailQueueService;
   }
 
   @Override
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional
   public Message createMessage(
       String model,
       int id,
@@ -89,7 +89,8 @@ public class MessageServiceImpl implements MessageService {
       Set<MetaFile> metaFiles,
       String addressBlock,
       int mediaTypeSelect,
-      EmailAccount emailAccount) {
+      EmailAccount emailAccount,
+      String signature) {
 
     emailAccount =
         emailAccount != null
@@ -103,7 +104,6 @@ public class MessageServiceImpl implements MessageService {
             id,
             null,
             0,
-            ZonedDateTime.now().toLocalDateTime(),
             false,
             MessageRepository.STATUS_DRAFT,
             subject,
@@ -114,7 +114,8 @@ public class MessageServiceImpl implements MessageService {
             bccEmailAddressList,
             addressBlock,
             mediaTypeSelect,
-            emailAccount);
+            emailAccount,
+            signature);
 
     messageRepository.save(message);
 
@@ -124,7 +125,7 @@ public class MessageServiceImpl implements MessageService {
   }
 
   @Override
-  @Transactional(rollbackOn = Exception.class)
+  @Transactional
   public void attachMetaFiles(Message message, Set<MetaFile> metaFiles) {
 
     Preconditions.checkNotNull(message.getId());
@@ -147,7 +148,6 @@ public class MessageServiceImpl implements MessageService {
       long relatedTo1SelectId,
       String relatedTo2Select,
       long relatedTo2SelectId,
-      LocalDateTime sentDate,
       boolean sentByEmail,
       int statusSelect,
       String subject,
@@ -158,12 +158,13 @@ public class MessageServiceImpl implements MessageService {
       List<EmailAddress> bccEmailAddressList,
       String addressBlock,
       int mediaTypeSelect,
-      EmailAccount emailAccount) {
+      EmailAccount emailAccount,
+      String signature) {
 
-    Set<EmailAddress> replyToEmailAddressSet = Sets.newHashSet(),
-        bccEmailAddressSet = Sets.newHashSet(),
-        toEmailAddressSet = Sets.newHashSet(),
-        ccEmailAddressSet = Sets.newHashSet();
+    Set<EmailAddress> replyToEmailAddressSet = Sets.newHashSet();
+    Set<EmailAddress> bccEmailAddressSet = Sets.newHashSet();
+    Set<EmailAddress> toEmailAddressSet = Sets.newHashSet();
+    Set<EmailAddress> ccEmailAddressSet = Sets.newHashSet();
 
     if (mediaTypeSelect == MessageRepository.MEDIA_TYPE_EMAIL) {
       if (replyToEmailAddressList != null) {
@@ -180,7 +181,9 @@ public class MessageServiceImpl implements MessageService {
       }
     }
 
-    if (emailAccount != null) {
+    if (!Strings.isNullOrEmpty(signature)) {
+      content += "<p></p><p></p>" + signature;
+    } else if (emailAccount != null) {
       content += "<p></p><p></p>" + Beans.get(MailAccountService.class).getSignature(emailAccount);
     }
 
@@ -217,13 +220,13 @@ public class MessageServiceImpl implements MessageService {
       } else if (message.getMediaTypeSelect() == MessageRepository.MEDIA_TYPE_CHAT) {
         return sendToUser(message);
       }
-    } catch (MessagingException | IOException e) {
+    } catch (MessagingException e) {
       TraceBackService.trace(e);
     }
     return message;
   }
 
-  @Transactional(rollbackOn = Exception.class)
+  @Transactional
   public Message sendToUser(Message message) {
 
     if (message.getRecipientUser() == null) {
@@ -239,7 +242,7 @@ public class MessageServiceImpl implements MessageService {
     return messageRepository.save(message);
   }
 
-  @Transactional(rollbackOn = Exception.class)
+  @Transactional
   public Message sendByMail(Message message) {
 
     log.debug("Sent mail");
@@ -249,9 +252,8 @@ public class MessageServiceImpl implements MessageService {
     return messageRepository.save(message);
   }
 
-  @Transactional(rollbackOn = {MessagingException.class, IOException.class, Exception.class})
-  public Message sendByEmail(Message message)
-      throws MessagingException, IOException, AxelorException {
+  @Transactional(rollbackOn = {Exception.class})
+  public Message sendByEmail(Message message) throws MessagingException, AxelorException {
 
     EmailAccount mailAccount = message.getMailAccount();
 
@@ -259,7 +261,7 @@ public class MessageServiceImpl implements MessageService {
       return message;
     }
 
-    log.debug("Sent email");
+    log.debug("Sending email...");
     MailAccountService mailAccountService = Beans.get(MailAccountService.class);
     com.axelor.mail.MailAccount account =
         new SmtpAccount(
@@ -269,10 +271,10 @@ public class MessageServiceImpl implements MessageService {
             mailAccountService.getDecryptPassword(mailAccount.getPassword()),
             mailAccountService.getSecurity(mailAccount));
 
-    List<String> replytoRecipients = this.getEmailAddresses(message.getReplyToEmailAddressSet()),
-        toRecipients = this.getEmailAddresses(message.getToEmailAddressSet()),
-        ccRecipients = this.getEmailAddresses(message.getCcEmailAddressSet()),
-        bccRecipients = this.getEmailAddresses(message.getBccEmailAddressSet());
+    List<String> replytoRecipients = this.getEmailAddresses(message.getReplyToEmailAddressSet());
+    List<String> toRecipients = this.getEmailAddresses(message.getToEmailAddressSet());
+    List<String> ccRecipients = this.getEmailAddresses(message.getCcEmailAddressSet());
+    List<String> bccRecipients = this.getEmailAddresses(message.getBccEmailAddressSet());
 
     if (toRecipients.isEmpty() && ccRecipients.isEmpty() && bccRecipients.isEmpty()) {
       throw new AxelorException(
@@ -286,14 +288,24 @@ public class MessageServiceImpl implements MessageService {
 
     mailBuilder.subject(message.getSubject());
 
-    if (message.getFromEmailAddress() != null) {
-      if (!Strings.isNullOrEmpty(message.getFromEmailAddress().getAddress())) {
-        log.debug("Override from :::  {}", this.getFullEmailAddress(message.getFromEmailAddress()));
-        mailBuilder.from(this.getFullEmailAddress(message.getFromEmailAddress()));
-      } else {
-        throw new AxelorException(
-            message, TraceBackRepository.CATEGORY_CONFIGURATION_ERROR, IExceptionMessage.MESSAGE_5);
+    if (!Strings.isNullOrEmpty(mailAccount.getFromAddress())) {
+      String fromAddress = mailAccount.getFromAddress();
+      if (!Strings.isNullOrEmpty(mailAccount.getFromName())) {
+        fromAddress =
+            String.format("%s <%s>", mailAccount.getFromName(), mailAccount.getFromAddress());
+      } else if (message.getFromEmailAddress() != null) {
+        if (!Strings.isNullOrEmpty(message.getFromEmailAddress().getAddress())) {
+          log.debug(
+              "Override from :::  {}", this.getFullEmailAddress(message.getFromEmailAddress()));
+          mailBuilder.from(this.getFullEmailAddress(message.getFromEmailAddress()));
+        } else {
+          throw new AxelorException(
+              message,
+              TraceBackRepository.CATEGORY_CONFIGURATION_ERROR,
+              IExceptionMessage.MESSAGE_5);
+        }
       }
+      mailBuilder.from(fromAddress);
     }
     if (replytoRecipients != null && !replytoRecipients.isEmpty()) {
       mailBuilder.replyTo(Joiner.on(",").join(replytoRecipients));
@@ -316,30 +328,10 @@ public class MessageServiceImpl implements MessageService {
       mailBuilder.attach(metaFile.getFileName(), MetaFiles.getPath(metaFile).toString());
     }
 
-    // Make sure message can be found in sending thread below.
-    JPA.flush();
-
+    getEntityManager().flush();
+    getEntityManager().lock(message, LockModeType.PESSIMISTIC_WRITE);
     // send email using a separate process to avoid thread blocking
-    executor.submit(
-        new Callable<Boolean>() {
-          @Override
-          public Boolean call() {
-            try {
-              mailBuilder.send();
-              Message updateMessage = messageRepository.find(message.getId());
-              JPA.em().getTransaction().begin();
-              updateMessage.setSentByEmail(true);
-              updateMessage.setStatusSelect(MessageRepository.STATUS_SENT);
-              updateMessage.setSentDateT(LocalDateTime.now());
-              updateMessage.setSenderUser(AuthUtils.getUser());
-              messageRepository.save(updateMessage);
-              JPA.em().getTransaction().commit();
-            } catch (Exception e) {
-              TraceBackService.trace(e);
-            }
-            return true;
-          }
-        });
+    sendMailQueueService.submitMailJob(mailBuilder, message);
 
     return message;
   }
@@ -378,7 +370,7 @@ public class MessageServiceImpl implements MessageService {
   }
 
   @Override
-  @Transactional(rollbackOn = Exception.class)
+  @Transactional(rollbackOn = {Exception.class})
   public Message regenerateMessage(Message message) throws Exception {
     Preconditions.checkNotNull(
         message.getTemplate(),

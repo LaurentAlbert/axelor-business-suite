@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -22,4 +22,5 @@ public interface ITranslation {
   public static final String TRAINING_APP_NAME = /*$$(*/ "value:Training"; /*)*/
   public static final String RECRUITMENT_APP_NAME = /*$$(*/ "value:Recruitment"; /*)*/
   public static final String APPRAISAL_APP_NAME = /*$$(*/ "value:Appraisal"; /*)*/
+  public static final String OVERALL_RATING = /*$$(*/ "Overall rating"; /*)*/
 }

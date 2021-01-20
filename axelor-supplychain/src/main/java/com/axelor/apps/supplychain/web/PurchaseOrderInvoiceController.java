@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -28,13 +28,10 @@ import com.axelor.inject.Beans;
 import com.axelor.meta.schema.actions.ActionView;
 import com.axelor.rpc.ActionRequest;
 import com.axelor.rpc.ActionResponse;
-import com.google.inject.Inject;
 import com.google.inject.Singleton;
 
 @Singleton
 public class PurchaseOrderInvoiceController {
-
-  @Inject private PurchaseOrderInvoiceService purchaseOrderInvoiceService;
 
   public void generateInvoice(ActionRequest request, ActionResponse response) {
 
@@ -43,7 +40,7 @@ public class PurchaseOrderInvoiceController {
     purchaseOrder = Beans.get(PurchaseOrderRepository.class).find(purchaseOrder.getId());
 
     try {
-      Invoice invoice = purchaseOrderInvoiceService.generateInvoice(purchaseOrder);
+      Invoice invoice = Beans.get(PurchaseOrderInvoiceService.class).generateInvoice(purchaseOrder);
 
       if (invoice != null) {
         response.setReload(true);
@@ -52,6 +49,7 @@ public class PurchaseOrderInvoiceController {
                 .model(Invoice.class.getName())
                 .add("form", "invoice-form")
                 .add("grid", "invoice-grid")
+                .param("search-filters", "customer-invoices-filters")
                 .domain("self.purchaseOrder.id = " + String.valueOf(invoice.getId()))
                 .context("_showRecord", String.valueOf(invoice.getId()))
                 .map());

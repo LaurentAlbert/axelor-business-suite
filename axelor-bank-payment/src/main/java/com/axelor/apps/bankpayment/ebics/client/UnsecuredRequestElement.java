@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -29,7 +29,9 @@ import com.axelor.apps.account.ebics.schema.h003.UnsecuredRequestStaticHeaderTyp
 import com.axelor.apps.bankpayment.ebics.xml.DefaultEbicsRootElement;
 import com.axelor.apps.bankpayment.ebics.xml.EbicsXmlFactory;
 import com.axelor.auth.AuthUtils;
+import com.axelor.auth.db.User;
 import com.axelor.exception.AxelorException;
+import java.util.Optional;
 
 /**
  * The <code>UnsecuredRequestElement</code> is the common element used for key management requests.
@@ -69,7 +71,8 @@ public class UnsecuredRequestElement extends DefaultEbicsRootElement {
 
     productType =
         EbicsXmlFactory.creatProductElementType(
-            AuthUtils.getUser().getLanguage(), session.getProduct().getName());
+            Optional.ofNullable(AuthUtils.getUser()).map(User::getLanguage).orElse(null),
+            session.getProduct().getName());
 
     try {
       xstatic =

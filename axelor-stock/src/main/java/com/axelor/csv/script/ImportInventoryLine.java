@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -40,7 +40,7 @@ public class ImportInventoryLine {
 
   @Inject private AppBaseService appBaseService;
 
-  @Transactional
+  @Transactional(rollbackOn = {Exception.class})
   public Object importInventoryLine(Object bean, Map<String, Object> values)
       throws AxelorException {
 
@@ -54,6 +54,8 @@ public class ImportInventoryLine {
     BigDecimal qtyByTracking = BigDecimal.ONE;
 
     BigDecimal realQtyRemaning = inventoryLine.getRealQty();
+
+    inventoryLineService.compute(inventoryLine, inventoryLine.getInventory());
 
     TrackingNumber trackingNumber;
 
@@ -75,7 +77,9 @@ public class ImportInventoryLine {
             trackingNumberService.createTrackingNumber(
                 inventoryLine.getProduct(),
                 inventoryLine.getInventory().getStockLocation().getCompany(),
-                appBaseService.getTodayDate());
+                appBaseService.getTodayDate(
+                    inventoryLine.getInventory().getStockLocation().getCompany()),
+                inventoryLine.getInventory().getInventorySeq());
 
         if (realQtyRemaning.compareTo(qtyByTracking) < 0) {
           trackingNumber.setCounter(realQtyRemaning);
@@ -90,6 +94,8 @@ public class ImportInventoryLine {
                 inventoryLine.getCurrentQty(),
                 inventoryLine.getRack(),
                 trackingNumber);
+
+        inventoryLineNew.setUnit(inventoryLine.getProduct().getUnit());
 
         if (realQtyRemaning.compareTo(qtyByTracking) < 0) {
           inventoryLineNew.setRealQty(realQtyRemaning);

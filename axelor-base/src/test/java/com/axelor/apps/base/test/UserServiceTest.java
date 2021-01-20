@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -17,6 +17,7 @@
  */
 package com.axelor.apps.base.test;
 
+import com.axelor.app.AppModule;
 import com.axelor.app.AxelorModule;
 import com.axelor.apps.base.module.AdminModule;
 import com.axelor.apps.base.module.BaseModule;
@@ -47,6 +48,7 @@ public class UserServiceTest {
       install(new MessageModule());
       install(new AdminModule());
       install(new BaseModule());
+      install(new AppModule());
     }
   }
 

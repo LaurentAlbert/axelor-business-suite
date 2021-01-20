@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -110,7 +110,7 @@ public class ImportService {
     return actionBuilderRepo.save((ActionBuilder) bean);
   }
 
-  public Object importWkf(Object bean, Map<String, Object> values) {
+  public Object importWkf(Object bean, Map<String, Object> values) throws Exception {
 
     assert bean instanceof Wkf;
 
@@ -225,7 +225,7 @@ public class ImportService {
     return dashboardBuilderRepo.save(dashboard);
   }
 
-  public Object importAppWkf(Object bean, Map<String, Object> values) {
+  public Object importAppWkf(Object bean, Map<String, Object> values) throws Exception {
 
     assert bean instanceof Wkf;
 

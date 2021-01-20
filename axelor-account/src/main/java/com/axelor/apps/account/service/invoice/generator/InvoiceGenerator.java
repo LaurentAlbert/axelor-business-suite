@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -111,7 +111,7 @@ public abstract class InvoiceGenerator {
     this.inAti = inAti;
     this.companyBankDetails = companyBankDetails;
     this.tradingName = tradingName;
-    this.today = Beans.get(AppAccountService.class).getTodayDate();
+    this.today = Beans.get(AppAccountService.class).getTodayDate(company);
   }
 
   /**
@@ -144,11 +144,11 @@ public abstract class InvoiceGenerator {
     this.externalReference = externalReference;
     this.inAti = inAti;
     this.tradingName = tradingName;
-    this.today = Beans.get(AppAccountService.class).getTodayDate();
+    this.today = Beans.get(AppAccountService.class).getTodayDate(company);
   }
 
   protected InvoiceGenerator() {
-    this.today = Beans.get(AppAccountService.class).getTodayDate();
+    this.today = Beans.get(AppAccountService.class).getTodayDate(company);
   }
 
   protected int inverseOperationType(int operationType) throws AxelorException {
@@ -200,6 +200,7 @@ public abstract class InvoiceGenerator {
     if (accountingSituation != null) {
       invoice.setInvoiceAutomaticMail(accountingSituation.getInvoiceAutomaticMail());
       invoice.setInvoiceMessageTemplate(accountingSituation.getInvoiceMessageTemplate());
+      invoice.setPfpValidatorUser(accountingSituation.getPfpValidatorUser());
     }
 
     if (paymentCondition == null) {
@@ -214,12 +215,6 @@ public abstract class InvoiceGenerator {
 
     if (mainInvoicingAddress == null) {
       mainInvoicingAddress = Beans.get(PartnerService.class).getInvoicingAddress(partner);
-    }
-    if (mainInvoicingAddress == null && partner.getIsCustomer()) {
-      throw new AxelorException(
-          TraceBackRepository.CATEGORY_MISSING_FIELD,
-          I18n.get(IExceptionMessage.INVOICE_GENERATOR_5),
-          I18n.get(com.axelor.apps.base.exceptions.IExceptionMessage.EXCEPTION));
     }
 
     invoice.setAddress(mainInvoicingAddress);
@@ -271,8 +266,7 @@ public abstract class InvoiceGenerator {
     if (partner.getFactorizedCustomer() && accountConfig.getFactorPartner() != null) {
       List<BankDetails> bankDetailsList = accountConfig.getFactorPartner().getBankDetailsList();
       companyBankDetails =
-          bankDetailsList
-              .stream()
+          bankDetailsList.stream()
               .filter(bankDetails -> bankDetails.getIsDefault())
               .findFirst()
               .orElse(null);
@@ -284,20 +278,19 @@ public abstract class InvoiceGenerator {
           companyBankDetails = accountingSituation.getCompanyInBankDetails();
         }
       }
-      if (companyBankDetails == null) {
-        companyBankDetails = company.getDefaultBankDetails();
-        List<BankDetails> allowedBDs =
-            Beans.get(PaymentModeService.class).getCompatibleBankDetailsList(paymentMode, company);
-        if (!allowedBDs.contains(companyBankDetails)) {
-          companyBankDetails = null;
-        }
+    }
+    if (companyBankDetails == null) {
+      companyBankDetails = company.getDefaultBankDetails();
+      List<BankDetails> allowedBDs =
+          Beans.get(PaymentModeService.class).getCompatibleBankDetailsList(paymentMode, company);
+      if (!allowedBDs.contains(companyBankDetails)) {
+        companyBankDetails = null;
       }
     }
     invoice.setCompanyBankDetails(companyBankDetails);
 
-    if (companyBankDetails != null
-        && !Strings.isNullOrEmpty(companyBankDetails.getSpecificNoteOnInvoice())) {
-      invoice.setNote(companyBankDetails.getSpecificNoteOnInvoice());
+    if (partner != null && !Strings.isNullOrEmpty(partner.getInvoiceComments())) {
+      invoice.setNote(partner.getInvoiceComments());
     }
 
     invoice.setInvoicesCopySelect(getInvoiceCopy());
@@ -309,7 +302,9 @@ public abstract class InvoiceGenerator {
 
   public int getInvoiceCopy() {
     if (partner.getIsCustomer()) {
-      return partner.getInvoicesCopySelect();
+      return (partner.getInvoicesCopySelect() == 0)
+          ? DEFAULT_INVOICE_COPY
+          : partner.getInvoicesCopySelect();
     }
     return DEFAULT_INVOICE_COPY;
   }

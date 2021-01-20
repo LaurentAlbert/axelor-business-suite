@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -33,7 +33,6 @@ import com.axelor.rpc.filter.Filter;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import com.google.inject.persist.Transactional;
-import java.lang.invoke.MethodHandles;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -44,7 +43,6 @@ import org.slf4j.LoggerFactory;
 @Singleton
 public class DuplicateObjectsService {
 
-  private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   private final Logger log = LoggerFactory.getLogger(DuplicateObjectsService.class);
   @Inject private MetaFieldRepository metaFieldRepo;
 
@@ -199,7 +197,7 @@ public class DuplicateObjectsService {
    */ private String concatFields(Class<?> modelClass, Set<String> fieldSet)
       throws AxelorException {
 
-    StringBuilder fields = new StringBuilder("concat(");
+    StringBuilder fields = new StringBuilder("LOWER(concat(");
     Mapper mapper = Mapper.of(modelClass);
 
     int count = 0;
@@ -230,7 +228,7 @@ public class DuplicateObjectsService {
       }
       fields.append(" as string)");
     }
-    fields.append(")");
+    fields.append("))");
 
     return fields.toString();
   }

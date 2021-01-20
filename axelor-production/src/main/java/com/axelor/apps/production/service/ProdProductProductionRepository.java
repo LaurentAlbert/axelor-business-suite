@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -17,9 +17,13 @@
  */
 package com.axelor.apps.production.service;
 
+import com.axelor.apps.base.service.app.AppBaseService;
 import com.axelor.apps.production.db.repo.ProdProductRepository;
+import com.axelor.apps.production.service.app.AppProductionService;
 import com.axelor.db.JPA;
+import com.axelor.inject.Beans;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +32,12 @@ public class ProdProductProductionRepository extends ProdProductRepository {
 
   @Override
   public Map<String, Object> populate(Map<String, Object> json, Map<String, Object> context) {
+
+    if (!Beans.get(AppProductionService.class).isApp("production")) {
+
+      return super.populate(json, context);
+    }
+
     Object productFromView = json.get("product");
     Object qtyFromView = json.get("qty");
     Object toProduceManufOrderIdFromView;
@@ -53,6 +63,7 @@ public class ProdProductProductionRepository extends ProdProductRepository {
 
   protected BigDecimal computeMissingQty(
       Long productId, BigDecimal qty, Long toProduceManufOrderId) {
+    int scale = Beans.get(AppBaseService.class).getNbDecimalDigitForQty();
     if (productId == null || qty == null || toProduceManufOrderId == null) {
       return BigDecimal.ZERO;
     }
@@ -75,6 +86,6 @@ public class ProdProductProductionRepository extends ProdProductRepository {
     } else {
       availableQty = queryResult.get(0);
     }
-    return BigDecimal.ZERO.max(qty.subtract(availableQty));
+    return BigDecimal.ZERO.max(qty.subtract(availableQty)).setScale(scale, RoundingMode.HALF_UP);
   }
 }

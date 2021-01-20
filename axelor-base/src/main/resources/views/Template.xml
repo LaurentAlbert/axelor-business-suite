@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <object-views xmlns="http://axelor.com/xml/ns/object-views"
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://axelor.com/xml/ns/object-views http://axelor.com/xml/ns/object-views/object-views_5.0.xsd">
+	xsi:schemaLocation="http://axelor.com/xml/ns/object-views http://axelor.com/xml/ns/object-views/object-views_5.3.xsd">
     
     <grid name="template-grid" id="template-grid-base" title="Templates" model="com.axelor.apps.message.db.Template">
         <field name="name"/>
@@ -24,14 +24,16 @@
 					<field name="name" showTitle="true" />
 				</editor>
 			</field>
-			<field name="mediaTypeSelect" colSpan="6" />
-			<field name="metaModel" canEdit="false" form-view="meta-model-form"
-				grid-view="meta-model-grid" />
+			<field name="mediaTypeSelect" />
+			<field name="language" canEdit="false" form-view="language-form" grid-view="language-grid" />
+			<field name="templateEngineSelect"/>
+			<field name="isJson" onChange="action-template-record-is-json-change"/>
+			<panel itemSpan="12">
+				<field name="metaModel" hideIf="isJson" canEdit="false" form-view="meta-model-form" grid-view="meta-model-grid" />
+				<field name="metaJsonModel" showIf="isJson" canEdit="false" form-view="json-model-form" grid-view="json-model-grid" />			
+			</panel>
 			<field name="target" hidden="true" />
-			<field name="templateContext" canEdit="false" form-view="template-context-form"
-				grid-view="template-context-grid" hidden="true" />
-			<field name="language" canEdit="false" form-view="language-form"
-				grid-view="language-grid" />
+			<field name="templateContext" canEdit="false" form-view="template-context-form" grid-view="template-context-grid" hidden="true" />
 		</panel>
 		<panel-tabs name="mainPanelTab">
 			<panel name="contentPanel" title="Contenu">
@@ -42,19 +44,24 @@
 				</panel>
 				<panel name="senderPanel" title="Sender" colSpan="12"
 					showIf="mediaTypeSelect == 2 || mediaTypeSelect == 4">
-					<field name="fromAdress" height="2" />
 					<field name="replyToRecipients" height="2" />
 				</panel>
 				<panel name="recipientsPanel" title="Recipients"
 					showIf="mediaTypeSelect == 2 || mediaTypeSelect == 4" colSpan="12">
-					<field name="toRecipients" colSpan="12" height="2" />
-					<field name="ccRecipients" colSpan="12" height="2" />
-					<field name="bccRecipients" colSpan="12" height="2" />
+					<field name="toRecipients" colSpan="12" height="2" help="Please use ',' ';' or '|' as separator between two email addresses."/>
+					<field name="ccRecipients" colSpan="12" height="2" help="Please use ',' ';' or '|' as separator between two email addresses."/>
+					<field name="bccRecipients" colSpan="12" height="2" help="Please use ',' ';' or '|' as separator between two email addresses."/>
 				</panel>
 				<panel name="subjectContentPanel" title="Content" colSpan="12">
 					<field name="subject" colSpan="12" height="2" />
 					<field name="content" showTitle="false" colSpan="12" widget="html" />
 				</panel>
+				<panel name="signature-panel" title="Signature"
+					showIf="mediaTypeSelect != 3" colSpan="12">
+					<field name="addSignature" widget="inline-checkbox" colSpan="3"/>
+					<field name="signature" colSpan="9" showIf="addSignature" help="If you leave this field empty or fill it with an incorrect formula, the default email account's signature will be used.\nExamples of a correct formulas:\n$__user__.emailSignature$\n$first(__user__.emailAccountList).signature$"/>
+				</panel>
+				<panel-related name="templateContextPanel" field="templateContextList" colSpan="12"/>
 				<panel name="attachedFilesPanel" title="Attached files" colSpan="12">
 					<field name="birtTemplate" colSpan="12" canEdit="false"
 						form-view="birt-template-form" grid-view="birt-template-grid" />
@@ -67,7 +74,7 @@
 		</panel-tabs>
 	</form>
 
-	 <action-method name="action-template-check-receptor">
+	<action-method name="action-template-check-receptor">
     	<call class="com.axelor.apps.base.web.TemplateController" method="checkTargetReceptor"/>
     </action-method>
     

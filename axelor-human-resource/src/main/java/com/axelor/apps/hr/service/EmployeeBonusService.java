@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -17,6 +17,7 @@
  */
 package com.axelor.apps.hr.service;
 
+import com.axelor.app.internal.AppFilter;
 import com.axelor.apps.base.db.Period;
 import com.axelor.apps.hr.db.Employee;
 import com.axelor.apps.hr.db.EmployeeBonusMgt;
@@ -25,9 +26,12 @@ import com.axelor.apps.hr.db.HRConfig;
 import com.axelor.apps.hr.db.repo.EmployeeBonusMgtLineRepository;
 import com.axelor.apps.hr.db.repo.EmployeeBonusMgtRepository;
 import com.axelor.apps.hr.db.repo.EmployeeRepository;
+import com.axelor.apps.hr.exception.IExceptionMessage;
 import com.axelor.apps.hr.service.employee.EmployeeServiceImpl;
 import com.axelor.exception.AxelorException;
+import com.axelor.exception.db.repo.TraceBackRepository;
 import com.axelor.exception.service.TraceBackService;
+import com.axelor.i18n.I18n;
 import com.axelor.inject.Beans;
 import com.axelor.tool.template.TemplateMaker;
 import com.google.common.base.Strings;
@@ -38,7 +42,6 @@ import groovy.lang.GroovyShell;
 import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import org.codehaus.groovy.control.CompilerConfiguration;
 import org.codehaus.groovy.control.customizers.ImportCustomizer;
@@ -53,7 +56,7 @@ public class EmployeeBonusService {
 
   private static final char TEMPLATE_DELIMITER = '$';
 
-  @Transactional
+  @Transactional(rollbackOn = {Exception.class})
   public void compute(EmployeeBonusMgt bonus) throws AxelorException {
     Map<Employee, EmployeeBonusMgtLine> employeeStatus = new HashMap<>();
     for (EmployeeBonusMgtLine line : bonus.getEmployeeBonusMgtLineList()) {
@@ -65,7 +68,12 @@ public class EmployeeBonusService {
             .all()
             .filter("self.mainEmploymentContract.payCompany = ?1", bonus.getCompany())
             .fetch();
-    TemplateMaker maker = new TemplateMaker(Locale.FRENCH, TEMPLATE_DELIMITER, TEMPLATE_DELIMITER);
+    TemplateMaker maker =
+        new TemplateMaker(
+            bonus.getCompany().getTimezone(),
+            AppFilter.getLocale(),
+            TEMPLATE_DELIMITER,
+            TEMPLATE_DELIMITER);
     String eval;
     CompilerConfiguration conf = new CompilerConfiguration();
     ImportCustomizer customizer = new ImportCustomizer();
@@ -173,6 +181,14 @@ public class EmployeeBonusService {
               String.valueOf(
                   employeeService.getDaysWorksInPeriod(
                       employee, period.getFromDate(), period.getToDate())));
+    }
+
+    // For checking that formula contains variables like $*$
+    if (formula.matches("(\\$\\w+\\$).+")) {
+      throw new AxelorException(
+          TraceBackRepository.CATEGORY_MISSING_FIELD,
+          I18n.get(IExceptionMessage.HR_CONFIG_FORMULA_VARIABLE_MISSING),
+          hrConfig.getCompany().getName());
     }
     return formula;
   }

@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -37,7 +37,6 @@ import com.axelor.inject.Beans;
 import com.axelor.meta.schema.actions.ActionView;
 import com.axelor.rpc.ActionRequest;
 import com.axelor.rpc.ActionResponse;
-import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import java.lang.invoke.MethodHandles;
 import java.math.BigDecimal;
@@ -49,20 +48,15 @@ public class ProjectController {
 
   private final Logger logger = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-  @Inject private ProjectBusinessService projectBusinessService;
-
-  @Inject private InvoicingProjectService invoicingProjectService;
-
-  @Inject private ProjectRepository projectRepo;
-
   public void generateQuotation(ActionRequest request, ActionResponse response) {
     try {
       Project project = request.getContext().asType(Project.class);
-      SaleOrder order = projectBusinessService.generateQuotation(project);
+      SaleOrder order = Beans.get(ProjectBusinessService.class).generateQuotation(project);
       response.setView(
-          ActionView.define("Sale Order")
+          ActionView.define(I18n.get("Sale quotation"))
               .model(SaleOrder.class.getName())
               .add("form", "sale-order-form")
+              .param("forceTitle", "true")
               .context("_showRecord", String.valueOf(order.getId()))
               .map());
     } catch (Exception e) {
@@ -78,7 +72,8 @@ public class ProjectController {
               .model(PurchaseOrder.class.getName())
               .add("form", "purchase-order-form")
               .add("grid", "purchase-order-quotation-grid")
-              .context("_project", projectRepo.find(project.getId()))
+              .param("search-filters", "purchase-order-filters")
+              .context("_project", Beans.get(ProjectRepository.class).find(project.getId()))
               .map());
     }
   }
@@ -86,11 +81,14 @@ public class ProjectController {
   public void printProject(ActionRequest request, ActionResponse response) throws AxelorException {
     Project project = request.getContext().asType(Project.class);
 
-    String name = I18n.get("Project") + " " + project.getCode();
+    String name = I18n.get("Project") + " " + (project.getCode() != null ? project.getCode() : "");
 
     String fileLink =
         ReportFactory.createReport(IReport.PROJECT, name + "-${date}")
             .addParam("ProjectId", project.getId())
+            .addParam(
+                "Timezone",
+                project.getCompany() != null ? project.getCompany().getTimezone() : null)
             .addParam("Locale", ReportSettings.getPrintingLocale(null))
             .toAttach(project)
             .generate()
@@ -129,7 +127,7 @@ public class ProjectController {
 
     int toInvoiceCount = 0;
     if (project.getId() != null) {
-      toInvoiceCount = invoicingProjectService.countToInvoice(project);
+      toInvoiceCount = Beans.get(InvoicingProjectService.class).countToInvoice(project);
     }
 
     response.setValue("$toInvoiceCounter", toInvoiceCount);
@@ -164,6 +162,9 @@ public class ProjectController {
     String fileLink =
         ReportFactory.createReport(IReport.PLANNIF_AND_COST, name)
             .addParam("ProjectId", project.getId())
+            .addParam(
+                "Timezone",
+                project.getCompany() != null ? project.getCompany().getTimezone() : null)
             .addParam("Locale", ReportSettings.getPrintingLocale(null))
             .toAttach(project)
             .generate()

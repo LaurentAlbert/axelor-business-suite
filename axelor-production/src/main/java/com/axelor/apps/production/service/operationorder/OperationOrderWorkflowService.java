@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -17,17 +17,19 @@
  */
 package com.axelor.apps.production.service.operationorder;
 
-import com.axelor.app.production.db.IWorkCenter;
 import com.axelor.apps.production.db.Machine;
+import com.axelor.apps.production.db.MachineTool;
 import com.axelor.apps.production.db.ManufOrder;
 import com.axelor.apps.production.db.OperationOrder;
 import com.axelor.apps.production.db.OperationOrderDuration;
 import com.axelor.apps.production.db.ProdProcessLine;
 import com.axelor.apps.production.db.WorkCenter;
+import com.axelor.apps.production.db.repo.MachineToolRepository;
 import com.axelor.apps.production.db.repo.ManufOrderRepository;
 import com.axelor.apps.production.db.repo.OperationOrderDurationRepository;
 import com.axelor.apps.production.db.repo.OperationOrderRepository;
 import com.axelor.apps.production.db.repo.ProductionConfigRepository;
+import com.axelor.apps.production.db.repo.WorkCenterRepository;
 import com.axelor.apps.production.exceptions.IExceptionMessage;
 import com.axelor.apps.production.service.app.AppProductionService;
 import com.axelor.apps.production.service.manuforder.ManufOrderStockMoveService;
@@ -55,17 +57,20 @@ public class OperationOrderWorkflowService {
   protected OperationOrderRepository operationOrderRepo;
   protected OperationOrderDurationRepository operationOrderDurationRepo;
   protected AppProductionService appProductionService;
+  protected MachineToolRepository machineToolRepo;
 
   @Inject
   public OperationOrderWorkflowService(
       OperationOrderStockMoveService operationOrderStockMoveService,
       OperationOrderRepository operationOrderRepo,
       OperationOrderDurationRepository operationOrderDurationRepo,
-      AppProductionService appProductionService) {
+      AppProductionService appProductionService,
+      MachineToolRepository machineToolRepo) {
     this.operationOrderStockMoveService = operationOrderStockMoveService;
     this.operationOrderRepo = operationOrderRepo;
     this.operationOrderDurationRepo = operationOrderDurationRepo;
     this.appProductionService = appProductionService;
+    this.machineToolRepo = machineToolRepo;
   }
 
   /**
@@ -76,7 +81,7 @@ public class OperationOrderWorkflowService {
    * @return
    * @throws AxelorException
    */
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public OperationOrder plan(OperationOrder operationOrder) throws AxelorException {
 
     if (CollectionUtils.isEmpty(operationOrder.getToConsumeProdProductList())) {
@@ -110,7 +115,7 @@ public class OperationOrderWorkflowService {
    * @return
    * @throws AxelorException
    */
-  @Transactional
+  @Transactional(rollbackOn = {Exception.class})
   public OperationOrder replan(OperationOrder operationOrder) throws AxelorException {
 
     operationOrder.setPlannedStartDateT(this.getLastOperationOrder(operationOrder));
@@ -162,9 +167,7 @@ public class OperationOrderWorkflowService {
             && lastOperationOrder
                 .getPlannedStartDateT()
                 .isAfter(operationOrder.getManufOrder().getPlannedStartDateT())) {
-          if (lastOperationOrder
-              .getMachineWorkCenter()
-              .equals(operationOrder.getMachineWorkCenter())) {
+          if (lastOperationOrder.getMachine().equals(operationOrder.getMachine())) {
             return lastOperationOrder.getPlannedEndDateT();
           }
           return lastOperationOrder.getPlannedStartDateT();
@@ -191,7 +194,7 @@ public class OperationOrderWorkflowService {
    *
    * @param operationOrder An operation order
    */
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public void start(OperationOrder operationOrder) throws AxelorException {
     if (operationOrder.getStatusSelect() != OperationOrderRepository.STATUS_IN_PROGRESS) {
       operationOrder.setStatusSelect(OperationOrderRepository.STATUS_IN_PROGRESS);
@@ -229,7 +232,7 @@ public class OperationOrderWorkflowService {
    *
    * @param operationOrder An operation order
    */
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional
   public void pause(OperationOrder operationOrder) {
     operationOrder.setStatusSelect(OperationOrderRepository.STATUS_STANDBY);
 
@@ -243,7 +246,7 @@ public class OperationOrderWorkflowService {
    *
    * @param operationOrder An operation order
    */
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional
   public void resume(OperationOrder operationOrder) {
     operationOrder.setStatusSelect(OperationOrderRepository.STATUS_IN_PROGRESS);
 
@@ -258,7 +261,7 @@ public class OperationOrderWorkflowService {
    *
    * @param operationOrder An operation order
    */
-  @Transactional
+  @Transactional(rollbackOn = {Exception.class})
   public void finish(OperationOrder operationOrder) throws AxelorException {
     operationOrder.setStatusSelect(OperationOrderRepository.STATUS_FINISHED);
     operationOrder.setRealEndDateT(appProductionService.getTodayDateTime().toLocalDateTime());
@@ -267,9 +270,10 @@ public class OperationOrderWorkflowService {
 
     operationOrderStockMoveService.finish(operationOrder);
     operationOrderRepo.save(operationOrder);
+    calculateHoursOfUse(operationOrder);
   }
 
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public void finishAndAllOpFinished(OperationOrder operationOrder) throws AxelorException {
     finish(operationOrder);
     Beans.get(ManufOrderWorkflowService.class).allOpFinished(operationOrder.getManufOrder());
@@ -280,7 +284,7 @@ public class OperationOrderWorkflowService {
    *
    * @param operationOrder An operation order
    */
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional
   public void cancel(OperationOrder operationOrder) throws AxelorException {
     int oldStatus = operationOrder.getStatusSelect();
     operationOrder.setStatusSelect(OperationOrderRepository.STATUS_CANCELED);
@@ -331,13 +335,7 @@ public class OperationOrderWorkflowService {
     if (operationOrder.getStatusSelect() == OperationOrderRepository.STATUS_FINISHED) {
       long durationLong = DurationTool.getSecondsDuration(computeRealDuration(operationOrder));
       operationOrder.setRealDuration(durationLong);
-      WorkCenter machineWorkCenter = operationOrder.getMachineWorkCenter();
-      Machine machine = null;
-      if (machineWorkCenter != null) {
-        machine = machineWorkCenter.getMachine();
-      } else if (operationOrder.getWorkCenter() != null) {
-        machine = operationOrder.getWorkCenter().getMachine();
-      }
+      Machine machine = operationOrder.getMachine();
       if (machine != null) {
         machine.setOperatingDuration(machine.getOperatingDuration() + durationLong);
       }
@@ -392,7 +390,7 @@ public class OperationOrderWorkflowService {
    * @param plannedEndDateT
    * @return
    */
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional
   public OperationOrder setPlannedDates(
       OperationOrder operationOrder,
       LocalDateTime plannedStartDateT,
@@ -411,7 +409,7 @@ public class OperationOrderWorkflowService {
    * @param realEndDateT
    * @return
    */
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional
   public OperationOrder setRealDates(
       OperationOrder operationOrder, LocalDateTime realStartDateT, LocalDateTime realEndDateT) {
 
@@ -471,8 +469,8 @@ public class OperationOrderWorkflowService {
 
     int workCenterTypeSelect = workCenter.getWorkCenterTypeSelect();
 
-    if (workCenterTypeSelect == IWorkCenter.WORK_CENTER_MACHINE
-        || workCenterTypeSelect == IWorkCenter.WORK_CENTER_BOTH) {
+    if (workCenterTypeSelect == WorkCenterRepository.WORK_CENTER_TYPE_MACHINE
+        || workCenterTypeSelect == WorkCenterRepository.WORK_CENTER_TYPE_BOTH) {
       Machine machine = workCenter.getMachine();
       if (machine == null) {
         throw new AxelorException(
@@ -494,5 +492,25 @@ public class OperationOrderWorkflowService {
     duration += nbCycles.multiply(durationPerCycle).longValue();
 
     return duration;
+  }
+
+  private void calculateHoursOfUse(OperationOrder operationOrder) {
+
+    if (operationOrder.getMachineTool() == null) {
+      return;
+    }
+
+    Double hoursOfUse =
+        operationOrderRepo
+            .all()
+            .filter("self.machineTool.id = :id AND self.statusSelect = 6")
+            .bind("id", operationOrder.getMachineTool().getId())
+            .fetchStream()
+            .mapToDouble(list -> list.getRealDuration())
+            .sum();
+
+    MachineTool machineTool = machineToolRepo.find(operationOrder.getMachineTool().getId());
+    machineTool.setHoursOfUse(Double.valueOf(hoursOfUse).longValue());
+    machineToolRepo.save(machineTool);
   }
 }

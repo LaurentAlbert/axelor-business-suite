@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -18,10 +18,17 @@
 package com.axelor.apps.account.db.repo;
 
 import com.axelor.apps.account.db.Invoice;
+import com.axelor.apps.account.db.InvoicePayment;
+import com.axelor.apps.account.db.SubrogationRelease;
 import com.axelor.apps.account.service.invoice.InvoiceService;
+import com.axelor.apps.account.service.invoice.InvoiceToolService;
+import com.axelor.exception.service.TraceBackService;
 import com.axelor.inject.Beans;
-import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
 import javax.persistence.PersistenceException;
+import org.apache.commons.collections.CollectionUtils;
 
 public class InvoiceManagementRepository extends InvoiceRepository {
   @Override
@@ -29,45 +36,27 @@ public class InvoiceManagementRepository extends InvoiceRepository {
 
     Invoice copy = super.copy(entity, deep);
 
-    copy.setStatusSelect(STATUS_DRAFT);
-    copy.setInvoiceId(null);
-    copy.setInvoiceDate(null);
-    copy.setDueDate(null);
-    copy.setValidatedByUser(null);
-    copy.setMove(null);
-    copy.setOriginalInvoice(null);
-    copy.setCompanyInTaxTotalRemaining(BigDecimal.ZERO);
-    copy.setAmountPaid(BigDecimal.ZERO);
-    copy.setIrrecoverableStatusSelect(IRRECOVERABLE_STATUS_NOT_IRRECOUVRABLE);
-    copy.setAmountRejected(BigDecimal.ZERO);
-    copy.clearBatchSet();
-    copy.setDebitNumber(null);
-    copy.setDirectDebitManagement(null);
-    copy.setDoubtfulCustomerOk(false);
-    copy.setMove(null);
-    copy.setInterbankCodeLine(null);
-    copy.setPaymentMove(null);
-    copy.clearRefundInvoiceList();
-    copy.setRejectDate(null);
-    copy.setOriginalInvoice(null);
-    copy.setUsherPassageOk(false);
-    copy.setAlreadyPrintedOk(false);
-    copy.setCanceledPaymentSchedule(null);
-    copy.setDirectDebitAmount(BigDecimal.ZERO);
-    copy.setImportId(null);
-    copy.setPartnerAccount(null);
-    copy.setJournal(null);
-    copy.clearInvoicePaymentList();
-    copy.setPrintedPDF(null);
-    copy.setValidatedDate(null);
-    copy.setVentilatedByUser(null);
-    copy.setVentilatedDate(null);
+    InvoiceToolService.resetInvoiceStatusOnCopy(copy);
     return copy;
   }
 
   @Override
   public Invoice save(Invoice invoice) {
     try {
+      List<InvoicePayment> invoicePayments = invoice.getInvoicePaymentList();
+      if (CollectionUtils.isNotEmpty(invoicePayments)) {
+        LocalDate latestPaymentDate =
+            invoicePayments.stream()
+                .filter(
+                    invoicePayment ->
+                        invoicePayment.getStatusSelect()
+                            == InvoicePaymentRepository.STATUS_VALIDATED)
+                .map(InvoicePayment::getPaymentDate)
+                .max(LocalDate::compareTo)
+                .orElse(null);
+        invoice.setPaymentDate(latestPaymentDate);
+      }
+
       invoice = super.save(invoice);
       Beans.get(InvoiceService.class).setDraftSequence(invoice);
 
@@ -75,5 +64,31 @@ public class InvoiceManagementRepository extends InvoiceRepository {
     } catch (Exception e) {
       throw new PersistenceException(e.getLocalizedMessage());
     }
+  }
+
+  @Override
+  public Map<String, Object> populate(Map<String, Object> json, Map<String, Object> context) {
+    try {
+      final String subrogationStatusSelect = "$subrogationStatusSelect";
+      if (context.get("_model") != null
+          && context.get("_model").toString().equals(SubrogationRelease.class.getName())) {
+        if (context.get("id") != null) {
+          long id = (long) context.get("id");
+          SubrogationRelease subrogationRelease =
+              Beans.get(SubrogationReleaseRepository.class).find(id);
+          if (subrogationRelease != null && subrogationRelease.getStatusSelect() != null) {
+            json.put(subrogationStatusSelect, subrogationRelease.getStatusSelect());
+          } else {
+            json.put(subrogationStatusSelect, SubrogationReleaseRepository.STATUS_NEW);
+          }
+        }
+      } else {
+        json.put(subrogationStatusSelect, SubrogationReleaseRepository.STATUS_NEW);
+      }
+    } catch (Exception e) {
+      TraceBackService.trace(e);
+    }
+
+    return super.populate(json, context);
   }
 }

@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -39,7 +39,7 @@ import java.util.List;
 public class DepositSlipServiceImpl implements DepositSlipService {
 
   @Override
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public void loadPayments(DepositSlip depositSlip) throws AxelorException {
     if (depositSlip.getPublicationDate() != null) {
       throw new AxelorException(
@@ -55,7 +55,7 @@ public class DepositSlipServiceImpl implements DepositSlipService {
   }
 
   @Override
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public String publish(DepositSlip depositSlip) throws AxelorException {
     confirmPayments(depositSlip);
 
@@ -63,9 +63,13 @@ public class DepositSlipServiceImpl implements DepositSlipService {
         ReportFactory.createReport(getReportName(depositSlip), getFilename(depositSlip));
     settings.addParam("DepositSlipId", depositSlip.getId());
     settings.addParam("Locale", ReportSettings.getPrintingLocale(null));
+    settings.addParam(
+        "Timezone",
+        depositSlip.getCompany() != null ? depositSlip.getCompany().getTimezone() : null);
     settings.addFormat("pdf");
     String fileLink = settings.toAttach(depositSlip).generate().getFileLink();
-    depositSlip.setPublicationDate(Beans.get(AppBaseService.class).getTodayDate());
+    depositSlip.setPublicationDate(
+        Beans.get(AppBaseService.class).getTodayDate(depositSlip.getCompany()));
     return fileLink;
   }
 
@@ -108,8 +112,7 @@ public class DepositSlipServiceImpl implements DepositSlipService {
     if (depositSlip.getPaymentVoucherList() != null) {
       List<PaymentVoucher> paymentVoucherList = depositSlip.getPaymentVoucherList();
       BigDecimal totalAmount =
-          paymentVoucherList
-              .stream()
+          paymentVoucherList.stream()
               .map(PaymentVoucher::getPaidAmount)
               .reduce(BigDecimal.ZERO, BigDecimal::add);
       depositSlip.setTotalAmount(totalAmount);

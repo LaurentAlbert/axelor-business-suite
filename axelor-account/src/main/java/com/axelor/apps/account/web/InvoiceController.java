@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -38,10 +38,12 @@ import com.axelor.apps.base.db.Partner;
 import com.axelor.apps.base.db.PriceList;
 import com.axelor.apps.base.db.PrintingSettings;
 import com.axelor.apps.base.db.Wizard;
+import com.axelor.apps.base.db.repo.LanguageRepository;
 import com.axelor.apps.base.db.repo.PartnerRepository;
 import com.axelor.apps.base.service.AddressService;
 import com.axelor.apps.base.service.BankDetailsService;
 import com.axelor.apps.base.service.PartnerPriceListService;
+import com.axelor.apps.base.service.PartnerService;
 import com.axelor.apps.base.service.TradingNameService;
 import com.axelor.apps.tool.StringTool;
 import com.axelor.common.ObjectUtils;
@@ -59,8 +61,6 @@ import com.axelor.rpc.ActionResponse;
 import com.axelor.rpc.Context;
 import com.google.common.base.Function;
 import com.google.common.base.Joiner;
-import com.google.common.collect.Lists;
-import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
@@ -68,7 +68,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nullable;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -78,12 +78,6 @@ public class InvoiceController {
 
   @SuppressWarnings("unused")
   private final Logger logger = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
-
-  @Inject private InvoiceService invoiceService;
-
-  @Inject private InvoiceRepository invoiceRepo;
-
-  @Inject private InvoicePrintService invoicePrintService;
 
   /**
    * Fonction appeler par le bouton calculer
@@ -97,7 +91,7 @@ public class InvoiceController {
     Invoice invoice = request.getContext().asType(Invoice.class);
 
     try {
-      invoice = invoiceService.compute(invoice);
+      invoice = Beans.get(InvoiceService.class).compute(invoice);
       response.setValues(invoice);
     } catch (Exception e) {
       TraceBackService.trace(response, e);
@@ -114,32 +108,61 @@ public class InvoiceController {
   public void validate(ActionRequest request, ActionResponse response) throws AxelorException {
 
     Invoice invoice = request.getContext().asType(Invoice.class);
-    invoice = invoiceRepo.find(invoice.getId());
+    invoice = Beans.get(InvoiceRepository.class).find(invoice.getId());
 
     try {
-      invoiceService.validate(invoice);
+      // we have to inject TraceBackService to use non static methods
+      TraceBackService traceBackService = Beans.get(TraceBackService.class);
+      long tracebackCount = traceBackService.countMessageTraceBack(invoice);
+      Beans.get(InvoiceService.class).validate(invoice);
       response.setReload(true);
+      if (traceBackService.countMessageTraceBack(invoice) > tracebackCount) {
+        traceBackService
+            .findLastMessageTraceBack(invoice)
+            .ifPresent(
+                traceback ->
+                    response.setNotify(
+                        String.format(
+                            I18n.get(
+                                com.axelor.apps.message.exception.IExceptionMessage
+                                    .SEND_EMAIL_EXCEPTION),
+                            traceback.getMessage())));
+      }
     } catch (Exception e) {
       TraceBackService.trace(response, e);
     }
   }
 
   /**
-   * Fonction appeler par le bouton ventiler
+   * Called from invoice form view, on clicking ventilate button. Call {@link
+   * InvoiceService#ventilate(Invoice)}.
    *
    * @param request
    * @param response
-   * @return
-   * @throws AxelorException
    */
-  public void ventilate(ActionRequest request, ActionResponse response) throws AxelorException {
+  public void ventilate(ActionRequest request, ActionResponse response) {
 
     Invoice invoice = request.getContext().asType(Invoice.class);
-    invoice = invoiceRepo.find(invoice.getId());
+    invoice = Beans.get(InvoiceRepository.class).find(invoice.getId());
 
     try {
-      invoiceService.ventilate(invoice);
+      // we have to inject TraceBackService to use non static methods
+      TraceBackService traceBackService = Beans.get(TraceBackService.class);
+      long tracebackCount = traceBackService.countMessageTraceBack(invoice);
+      Beans.get(InvoiceService.class).ventilate(invoice);
       response.setReload(true);
+      if (traceBackService.countMessageTraceBack(invoice) > tracebackCount) {
+        traceBackService
+            .findLastMessageTraceBack(invoice)
+            .ifPresent(
+                traceback ->
+                    response.setNotify(
+                        String.format(
+                            I18n.get(
+                                com.axelor.apps.message.exception.IExceptionMessage
+                                    .SEND_EMAIL_EXCEPTION),
+                            traceback.getMessage())));
+      }
     } catch (Exception e) {
       TraceBackService.trace(response, e);
     }
@@ -150,18 +173,30 @@ public class InvoiceController {
    *
    * @param request
    * @param response
-   * @return
-   * @throws AxelorException
    */
-  public void validateAndVentilate(ActionRequest request, ActionResponse response)
-      throws AxelorException {
+  public void validateAndVentilate(ActionRequest request, ActionResponse response) {
 
     Invoice invoice = request.getContext().asType(Invoice.class);
-    invoice = invoiceRepo.find(invoice.getId());
+    invoice = Beans.get(InvoiceRepository.class).find(invoice.getId());
 
     try {
-      invoiceService.validateAndVentilate(invoice);
+      // we have to inject TraceBackService to use non static methods
+      TraceBackService traceBackService = Beans.get(TraceBackService.class);
+      long tracebackCount = traceBackService.countMessageTraceBack(invoice);
+      Beans.get(InvoiceService.class).validateAndVentilate(invoice);
       response.setReload(true);
+      if (traceBackService.countMessageTraceBack(invoice) > tracebackCount) {
+        traceBackService
+            .findLastMessageTraceBack(invoice)
+            .ifPresent(
+                traceback ->
+                    response.setNotify(
+                        String.format(
+                            I18n.get(
+                                com.axelor.apps.message.exception.IExceptionMessage
+                                    .SEND_EMAIL_EXCEPTION),
+                            traceback.getMessage())));
+      }
     } catch (Exception e) {
       TraceBackService.trace(response, e);
     }
@@ -177,9 +212,19 @@ public class InvoiceController {
   public void cancel(ActionRequest request, ActionResponse response) throws AxelorException {
 
     Invoice invoice = request.getContext().asType(Invoice.class);
-    invoice = invoiceRepo.find(invoice.getId());
+    invoice = Beans.get(InvoiceRepository.class).find(invoice.getId());
 
-    invoiceService.cancel(invoice);
+    if (invoice.getStatusSelect() == InvoiceRepository.STATUS_VENTILATED
+        && invoice.getCompany().getAccountConfig() != null
+        && !invoice.getCompany().getAccountConfig().getAllowCancelVentilatedInvoice()) {
+      response.setError(
+          I18n.get(
+              IExceptionMessage
+                  .INVOICE_CAN_NOT_GO_BACK_TO_VALIDATE_STATUS_OR_CANCEL_VENTILATED_INVOICE));
+      return;
+    }
+
+    Beans.get(InvoiceService.class).cancel(invoice);
     response.setFlash(I18n.get(IExceptionMessage.INVOICE_1));
     response.setReload(true);
   }
@@ -207,10 +252,10 @@ public class InvoiceController {
 
   public void checkNotImputedRefunds(ActionRequest request, ActionResponse response) {
     Invoice invoice = request.getContext().asType(Invoice.class);
-    invoice = invoiceRepo.find(invoice.getId());
+    invoice = Beans.get(InvoiceRepository.class).find(invoice.getId());
 
     try {
-      String msg = invoiceService.checkNotImputedRefunds(invoice);
+      String msg = Beans.get(InvoiceService.class).checkNotImputedRefunds(invoice);
       if (msg != null) {
         response.setFlash(msg);
       }
@@ -222,10 +267,10 @@ public class InvoiceController {
   public void checkNotLetteredAdvancePaymentMoveLines(
       ActionRequest request, ActionResponse response) {
     Invoice invoice = request.getContext().asType(Invoice.class);
-    invoice = invoiceRepo.find(invoice.getId());
+    invoice = Beans.get(InvoiceRepository.class).find(invoice.getId());
 
     try {
-      String msg = invoiceService.checkNotLetteredAdvancePaymentMoveLines(invoice);
+      String msg = Beans.get(InvoiceService.class).checkNotLetteredAdvancePaymentMoveLines(invoice);
       if (msg != null) {
         response.setFlash(msg);
       }
@@ -246,8 +291,8 @@ public class InvoiceController {
 
     try {
 
-      invoice = invoiceRepo.find(invoice.getId());
-      Invoice refund = invoiceService.createRefund(invoice);
+      invoice = Beans.get(InvoiceRepository.class).find(invoice.getId());
+      Invoice refund = Beans.get(InvoiceService.class).createRefund(invoice);
       response.setReload(true);
       response.setNotify(I18n.get(IExceptionMessage.INVOICE_2));
 
@@ -257,6 +302,7 @@ public class InvoiceController {
               .model(Invoice.class.getName())
               .add("form", "invoice-form")
               .add("grid", "invoice-grid")
+              .param("search-filters", "customer-invoices-filters")
               .param("forceTitle", "true")
               .context("_showRecord", refund.getId().toString())
               .domain("self.originalInvoice.id = " + invoice.getId())
@@ -269,10 +315,10 @@ public class InvoiceController {
   public void usherProcess(ActionRequest request, ActionResponse response) {
 
     Invoice invoice = request.getContext().asType(Invoice.class);
-    invoice = invoiceRepo.find(invoice.getId());
+    invoice = Beans.get(InvoiceRepository.class).find(invoice.getId());
 
     try {
-      invoiceService.usherProcess(invoice);
+      Beans.get(InvoiceService.class).usherProcess(invoice);
     } catch (Exception e) {
       TraceBackService.trace(response, e);
     }
@@ -281,7 +327,7 @@ public class InvoiceController {
   public void passInIrrecoverable(ActionRequest request, ActionResponse response) {
 
     Invoice invoice = request.getContext().asType(Invoice.class);
-    invoice = invoiceRepo.find(invoice.getId());
+    invoice = Beans.get(InvoiceRepository.class).find(invoice.getId());
 
     try {
       Beans.get(IrrecoverableService.class).passInIrrecoverable(invoice, true);
@@ -294,7 +340,7 @@ public class InvoiceController {
   public void notPassInIrrecoverable(ActionRequest request, ActionResponse response) {
 
     Invoice invoice = request.getContext().asType(Invoice.class);
-    invoice = invoiceRepo.find(invoice.getId());
+    invoice = Beans.get(InvoiceRepository.class).find(invoice.getId());
 
     try {
       Beans.get(IrrecoverableService.class).notPassInIrrecoverable(invoice);
@@ -306,7 +352,7 @@ public class InvoiceController {
 
   /** Method to generate invoice as a Pdf */
   @SuppressWarnings("unchecked")
-  public void showInvoices(ActionRequest request, ActionResponse response) {
+  public void showInvoice(ActionRequest request, ActionResponse response) {
     Context context = request.getContext();
     String fileLink;
     String title;
@@ -314,43 +360,51 @@ public class InvoiceController {
     try {
       if (!ObjectUtils.isEmpty(request.getContext().get("_ids"))) {
         List<Long> ids =
-            Lists.transform(
-                (List) request.getContext().get("_ids"),
-                new Function<Object, Long>() {
-                  @Nullable
-                  @Override
-                  public Long apply(@Nullable Object input) {
-                    return Long.parseLong(input.toString());
-                  }
-                });
-        fileLink = invoicePrintService.printInvoices(ids);
+            (List)
+                (((List) context.get("_ids"))
+                    .stream()
+                        .filter(ObjectUtils::notEmpty)
+                        .map(input -> Long.parseLong(input.toString()))
+                        .collect(Collectors.toList()));
+        fileLink = Beans.get(InvoicePrintService.class).printInvoices(ids);
         title = I18n.get("Invoices");
-      } else {
-        throw new AxelorException(
-            TraceBackRepository.CATEGORY_MISSING_FIELD, I18n.get(IExceptionMessage.INVOICE_3));
-      }
-      response.setView(ActionView.define(title).add("html", fileLink).map());
-    } catch (Exception e) {
-      TraceBackService.trace(response, e);
-    }
-  }
+      } else if (context.get("id") != null) {
+        String format = context.get("format") != null ? context.get("format").toString() : "pdf";
+        Integer reportType =
+            context.get("reportType") != null
+                ? Integer.parseInt(context.get("reportType").toString())
+                : null;
 
-  public void showInvoice(ActionRequest request, ActionResponse response) {
-    Context context = request.getContext();
-    String fileLink;
-    String title;
+        Map languageMap =
+            reportType != null
+                    && (reportType == 1 || reportType == 3)
+                    && context.get("language") != null
+                ? (Map<String, Object>) request.getContext().get("language")
+                : null;
+        String locale =
+            languageMap != null && languageMap.get("id") != null
+                ? Beans.get(LanguageRepository.class)
+                    .find(Long.parseLong(languageMap.get("id").toString()))
+                    .getCode()
+                : null;
 
-    try {
-      if (context.get("id") != null) {
-        Invoice invoice = invoiceRepo.find(request.getContext().asType(Invoice.class).getId());
-        fileLink = invoicePrintService.printInvoice(invoice, false);
+        fileLink =
+            Beans.get(InvoicePrintService.class)
+                .printInvoice(
+                    Beans.get(InvoiceRepository.class)
+                        .find(Long.parseLong(context.get("id").toString())),
+                    false,
+                    format,
+                    reportType,
+                    locale);
         title = I18n.get("Invoice");
+        response.setCanClose(true);
       } else {
         throw new AxelorException(
             TraceBackRepository.CATEGORY_MISSING_FIELD, I18n.get(IExceptionMessage.INVOICE_3));
       }
       response.setView(ActionView.define(title).add("html", fileLink).map());
-      response.setReload(true);
+      response.setCanClose(true);
     } catch (Exception e) {
       TraceBackService.trace(response, e);
     }
@@ -358,13 +412,21 @@ public class InvoiceController {
 
   public void regenerateAndShowInvoice(ActionRequest request, ActionResponse response) {
     Context context = request.getContext();
-    Invoice invoice = invoiceRepo.find(context.asType(Invoice.class).getId());
+    Invoice invoice =
+        Beans.get(InvoiceRepository.class).find(Long.parseLong(context.get("id").toString()));
+    Integer reportType =
+        context.get("reportType") != null
+            ? Integer.parseInt(context.get("reportType").toString())
+            : null;
 
     try {
-      response.setReload(true);
+      response.setCanClose(true);
       response.setView(
           ActionView.define(I18n.get("Invoice"))
-              .add("html", invoicePrintService.printInvoice(invoice, true))
+              .add(
+                  "html",
+                  Beans.get(InvoicePrintService.class)
+                      .printInvoice(invoice, true, "pdf", reportType, null))
               .map());
     } catch (Exception e) {
       TraceBackService.trace(response, e);
@@ -421,9 +483,9 @@ public class InvoiceController {
       Function<Collection<? extends Number>, Pair<Integer, Integer>> function;
 
       if (Beans.get(AppAccountService.class).getAppInvoice().getIsVentilationSkipped()) {
-        function = invoiceService::massValidateAndVentilate;
+        function = Beans.get(InvoiceService.class)::massValidateAndVentilate;
       } else {
-        function = invoiceService::massValidate;
+        function = Beans.get(InvoiceService.class)::massValidate;
       }
 
       massProcess(request, response, function);
@@ -434,7 +496,7 @@ public class InvoiceController {
 
   public void massVentilation(ActionRequest request, ActionResponse response) {
     try {
-      massProcess(request, response, invoiceService::massVentilate);
+      massProcess(request, response, Beans.get(InvoiceService.class)::massVentilate);
     } catch (Exception e) {
       TraceBackService.trace(response, e);
     }
@@ -485,7 +547,7 @@ public class InvoiceController {
     Invoice invoiceTemp;
     int count = 1;
     for (Long invoiceId : invoiceIdList) {
-      invoiceTemp = invoiceRepo.find(invoiceId);
+      invoiceTemp = Beans.get(InvoiceRepository.class).find(invoiceId);
       invoiceList.add(invoiceTemp);
       if (count == 1) {
         commonCompany = invoiceTemp.getCompany();
@@ -618,15 +680,16 @@ public class InvoiceController {
     }
     try {
       Invoice invoice =
-          invoiceService.mergeInvoiceProcess(
-              invoiceList,
-              commonCompany,
-              commonCurrency,
-              commonPartner,
-              commonContactPartner,
-              commonPriceList,
-              commonPaymentMode,
-              commonPaymentCondition);
+          Beans.get(InvoiceService.class)
+              .mergeInvoiceProcess(
+                  invoiceList,
+                  commonCompany,
+                  commonCurrency,
+                  commonPartner,
+                  commonContactPartner,
+                  commonPriceList,
+                  commonPaymentMode,
+                  commonPaymentCondition);
       if (invoice != null) {
         // Open the generated invoice in a new tab
         response.setView(
@@ -634,6 +697,7 @@ public class InvoiceController {
                 .model(Invoice.class.getName())
                 .add("grid", "invoice-grid")
                 .add("form", "invoice-form")
+                .param("search-filters", "customer-invoices-filters")
                 .param("forceEdit", "true")
                 .context("_showRecord", String.valueOf(invoice.getId()))
                 .map());
@@ -649,6 +713,14 @@ public class InvoiceController {
     response.setValue(
         "addressStr", Beans.get(AddressService.class).computeAddressStr(invoice.getAddress()));
   }
+
+  public void computeDeliveryAddressStr(ActionRequest request, ActionResponse response) {
+    Invoice invoice = request.getContext().asType(Invoice.class);
+    response.setValue(
+        "deliveryAddressStr",
+        Beans.get(AddressService.class).computeAddressStr(invoice.getDeliveryAddress()));
+  }
+
   /**
    * Called on load and in partner, company or payment mode change. Fill the bank details with a
    * default value.
@@ -687,7 +759,7 @@ public class InvoiceController {
 
     Invoice invoice = request.getContext().asType(Invoice.class);
     try {
-      String domain = invoiceService.createAdvancePaymentInvoiceSetDomain(invoice);
+      String domain = Beans.get(InvoiceService.class).createAdvancePaymentInvoiceSetDomain(invoice);
       response.setAttr("advancePaymentInvoiceSet", "domain", domain);
 
     } catch (Exception e) {
@@ -708,7 +780,8 @@ public class InvoiceController {
 
     Invoice invoice = request.getContext().asType(Invoice.class);
     try {
-      Set<Invoice> invoices = invoiceService.getDefaultAdvancePaymentInvoice(invoice);
+      Set<Invoice> invoices =
+          Beans.get(InvoiceService.class).getDefaultAdvancePaymentInvoice(invoice);
       response.setValue("advancePaymentInvoiceSet", invoices);
     } catch (Exception e) {
       TraceBackService.trace(response, e);
@@ -733,6 +806,12 @@ public class InvoiceController {
         response.setValue("invoiceAutomaticMail", accountingSituation.getInvoiceAutomaticMail());
         response.setValue(
             "invoiceMessageTemplate", accountingSituation.getInvoiceMessageTemplate());
+        response.setValue(
+            "invoiceAutomaticMailOnValidate",
+            accountingSituation.getInvoiceAutomaticMailOnValidate());
+        response.setValue(
+            "invoiceMessageTemplateOnValidate",
+            accountingSituation.getInvoiceMessageTemplateOnValidate());
       }
     }
   }
@@ -791,7 +870,7 @@ public class InvoiceController {
       if (partner == null) {
         return;
       }
-      int priceListTypeSelect = invoiceService.getPurchaseTypeOrSaleType(invoice);
+      int priceListTypeSelect = Beans.get(InvoiceService.class).getPurchaseTypeOrSaleType(invoice);
       response.setValue(
           "priceList",
           Beans.get(PartnerPriceListService.class)
@@ -811,7 +890,7 @@ public class InvoiceController {
   public void changePriceListDomain(ActionRequest request, ActionResponse response) {
     try {
       Invoice invoice = request.getContext().asType(Invoice.class);
-      int priceListTypeSelect = invoiceService.getPurchaseTypeOrSaleType(invoice);
+      int priceListTypeSelect = Beans.get(InvoiceService.class).getPurchaseTypeOrSaleType(invoice);
       String domain =
           Beans.get(PartnerPriceListService.class)
               .getPriceListDomain(invoice.getPartner(), priceListTypeSelect);
@@ -827,15 +906,12 @@ public class InvoiceController {
 
       if (!ObjectUtils.isEmpty(context.get("_ids"))) {
         List<Long> invoiceIdList =
-            Lists.transform(
-                (List) context.get("_ids"),
-                new Function<Object, Long>() {
-                  @Nullable
-                  @Override
-                  public Long apply(@Nullable Object input) {
-                    return Long.parseLong(input.toString());
-                  }
-                });
+            (List)
+                (((List) context.get("_ids"))
+                    .stream()
+                        .filter(ObjectUtils::notEmpty)
+                        .map(input -> Long.parseLong(input.toString()))
+                        .collect(Collectors.toList()));
 
         List<Long> invoiceToPay =
             Beans.get(InvoicePaymentCreateService.class).getInvoiceIdsToPay(invoiceIdList);
@@ -866,6 +942,75 @@ public class InvoiceController {
     response.setAttr(
         "$partnerBankDetailsListWarning",
         "hidden",
-        invoiceService.checkPartnerBankDetailsList(invoice));
+        Beans.get(InvoiceService.class).checkPartnerBankDetailsList(invoice));
+  }
+
+  public void refusalToPay(ActionRequest request, ActionResponse response) {
+    Invoice invoice = request.getContext().asType(Invoice.class);
+    Beans.get(InvoiceService.class)
+        .refusalToPay(
+            Beans.get(InvoiceRepository.class).find(invoice.getId()),
+            invoice.getReasonOfRefusalToPay(),
+            invoice.getReasonOfRefusalToPayStr());
+    response.setCanClose(true);
+  }
+
+  public void setPfpValidatorUser(ActionRequest request, ActionResponse response) {
+    Invoice invoice = request.getContext().asType(Invoice.class);
+    response.setValue(
+        "pfpValidatorUser", Beans.get(InvoiceService.class).getPfpValidatorUser(invoice));
+  }
+
+  public void setPfpValidatorUserDomain(ActionRequest request, ActionResponse response) {
+    Invoice invoice = request.getContext().asType(Invoice.class);
+    response.setAttr(
+        "pfpValidatorUser",
+        "domain",
+        Beans.get(InvoiceService.class).getPfpValidatorUserDomain(invoice));
+  }
+
+  public void hideSendEmailPfpBtn(ActionRequest request, ActionResponse response) {
+    Invoice invoice = request.getContext().asType(Invoice.class);
+    if (invoice.getPfpValidatorUser() == null) {
+      return;
+    }
+    response.setAttr(
+        "$isSelectedPfpValidatorEqualsPartnerPfpValidator",
+        "value",
+        invoice
+            .getPfpValidatorUser()
+            .equals(Beans.get(InvoiceService.class).getPfpValidatorUser(invoice)));
+  }
+
+  public void getInvoicePartnerDomain(ActionRequest request, ActionResponse response) {
+    Invoice invoice = request.getContext().asType(Invoice.class);
+    Company company = invoice.getCompany();
+
+    long companyId = company.getPartner() == null ? 0 : company.getPartner().getId();
+
+    String domain = String.format("self.id != %d AND self.isContact = false ", companyId);
+    domain += " AND :company member of self.companySet";
+
+    int invoiceTypeSelect = Beans.get(InvoiceService.class).getPurchaseTypeOrSaleType(invoice);
+
+    if (invoiceTypeSelect == 1) {
+      domain += " AND self.isCustomer = true ";
+    } else {
+      domain += " AND self.isSupplier = true ";
+    }
+
+    try {
+
+      if ((!(invoice.getInvoiceLineList() == null || invoice.getInvoiceLineList().isEmpty()))
+          && (invoiceTypeSelect == 1)) {
+
+        domain += Beans.get(PartnerService.class).getPartnerDomain(invoice.getPartner());
+      }
+
+    } catch (Exception e) {
+      TraceBackService.trace(e);
+      response.setError(e.getMessage());
+    }
+    response.setAttr("partner", "domain", domain);
   }
 }

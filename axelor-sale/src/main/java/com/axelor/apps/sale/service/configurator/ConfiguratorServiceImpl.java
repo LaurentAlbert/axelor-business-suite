@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -17,8 +17,10 @@
  */
 package com.axelor.apps.sale.service.configurator;
 
+import com.axelor.apps.base.db.Company;
 import com.axelor.apps.base.db.Product;
 import com.axelor.apps.base.db.repo.ProductRepository;
+import com.axelor.apps.base.service.app.AppBaseService;
 import com.axelor.apps.sale.db.Configurator;
 import com.axelor.apps.sale.db.ConfiguratorCreator;
 import com.axelor.apps.sale.db.ConfiguratorFormula;
@@ -31,6 +33,8 @@ import com.axelor.apps.sale.db.repo.SaleOrderRepository;
 import com.axelor.apps.sale.exception.IExceptionMessage;
 import com.axelor.apps.sale.service.saleorder.SaleOrderComputeService;
 import com.axelor.apps.sale.service.saleorder.SaleOrderLineService;
+import com.axelor.auth.AuthUtils;
+import com.axelor.auth.db.User;
 import com.axelor.db.JPA;
 import com.axelor.db.Model;
 import com.axelor.db.mapper.Mapper;
@@ -46,13 +50,22 @@ import com.axelor.meta.db.repo.MetaSelectItemRepository;
 import com.axelor.rpc.JsonContext;
 import com.axelor.script.GroovyScriptHelper;
 import com.axelor.script.ScriptHelper;
+import com.google.inject.Inject;
 import com.google.inject.persist.Transactional;
 import groovy.lang.MissingPropertyException;
+import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 public class ConfiguratorServiceImpl implements ConfiguratorService {
+
+  protected AppBaseService appBaseService;
+
+  @Inject
+  public ConfiguratorServiceImpl(AppBaseService appBaseService) {
+    this.appBaseService = appBaseService;
+  }
 
   @Override
   public void updateIndicators(
@@ -137,7 +150,7 @@ public class ConfiguratorServiceImpl implements ConfiguratorService {
    * @param jsonIndicators
    */
   @Override
-  @Transactional(rollbackOn = {Exception.class, AxelorException.class})
+  @Transactional(rollbackOn = {Exception.class})
   public void generate(
       Configurator configurator, JsonContext jsonAttributes, JsonContext jsonIndicators)
       throws AxelorException {
@@ -145,7 +158,7 @@ public class ConfiguratorServiceImpl implements ConfiguratorService {
   }
 
   @Override
-  @Transactional(rollbackOn = {Exception.class, AxelorException.class})
+  @Transactional(rollbackOn = {Exception.class})
   public void generateProduct(
       Configurator configurator, JsonContext jsonAttributes, JsonContext jsonIndicators)
       throws AxelorException {
@@ -179,7 +192,7 @@ public class ConfiguratorServiceImpl implements ConfiguratorService {
     Beans.get(ProductRepository.class).save(product);
   }
 
-  @Transactional
+  @Transactional(rollbackOn = {Exception.class})
   @Override
   public void addLineToSaleOrder(
       Configurator configurator,
@@ -193,15 +206,25 @@ public class ConfiguratorServiceImpl implements ConfiguratorService {
       // generate sale order line from product
       saleOrderLine = new SaleOrderLine();
       saleOrderLine.setSaleOrder(saleOrder);
-      generateProduct(configurator, jsonAttributes, jsonIndicators);
+      generate(configurator, jsonAttributes, jsonIndicators);
 
       saleOrderLine.setProduct(configurator.getProduct());
       this.fillSaleOrderWithProduct(saleOrderLine);
       Beans.get(SaleOrderLineService.class)
           .computeValues(saleOrderLine.getSaleOrder(), saleOrderLine);
+
+      String qtyFormula = configurator.getConfiguratorCreator().getQtyFormula();
+      BigDecimal qty = BigDecimal.ONE;
+      if (qtyFormula != null && !"".equals(qtyFormula)) {
+        Object result = computeFormula(qtyFormula, jsonAttributes);
+        if (result != null) {
+          qty = new BigDecimal(result.toString());
+        }
+      }
+      saleOrderLine.setQty(qty);
+      Beans.get(SaleOrderLineRepository.class).save(saleOrderLine);
     } else {
-      saleOrderLine =
-          generateSaleOrderLine(configurator, jsonAttributes, jsonIndicators, saleOrder);
+      generateSaleOrderLine(configurator, jsonAttributes, jsonIndicators, saleOrder);
     }
     Beans.get(SaleOrderComputeService.class).computeSaleOrder(saleOrder);
 
@@ -216,8 +239,7 @@ public class ConfiguratorServiceImpl implements ConfiguratorService {
   protected void fillSaleOrderWithProduct(SaleOrderLine saleOrderLine) throws AxelorException {
     SaleOrderLineService saleOrderLineService = Beans.get(SaleOrderLineService.class);
     if (saleOrderLine.getProduct() != null) {
-      saleOrderLineService.computeProductInformation(
-          saleOrderLine, saleOrderLine.getSaleOrder(), null);
+      saleOrderLineService.computeProductInformation(saleOrderLine, saleOrderLine.getSaleOrder());
     }
   }
 
@@ -284,7 +306,12 @@ public class ConfiguratorServiceImpl implements ConfiguratorService {
 
   @Override
   public Object computeFormula(String groovyFormula, JsonContext values) {
+    User currentUser = AuthUtils.getUser();
+    Company company = currentUser != null ? currentUser.getActiveCompany() : null;
 
+    values.put("__user__", currentUser);
+    values.put("__date__", appBaseService.getTodayDate(company));
+    values.put("__datetime__", appBaseService.getTodayDateTime(company));
     ScriptHelper scriptHelper = new GroovyScriptHelper(values);
 
     return scriptHelper.eval(groovyFormula);
@@ -293,7 +320,8 @@ public class ConfiguratorServiceImpl implements ConfiguratorService {
   public boolean areCompatible(String targetClassName, String fromClassName) {
     return targetClassName.equals(fromClassName)
         || (targetClassName.equals("BigDecimal") && fromClassName.equals("Integer"))
-        || (targetClassName.equals("BigDecimal") && fromClassName.equals("String"));
+        || (targetClassName.equals("BigDecimal") && fromClassName.equals("String"))
+        || (targetClassName.equals("String") && fromClassName.equals("GStringImpl"));
   }
 
   /**

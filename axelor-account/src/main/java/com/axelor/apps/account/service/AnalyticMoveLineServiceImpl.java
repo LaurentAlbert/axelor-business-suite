@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -143,6 +143,29 @@ public class AnalyticMoveLineServiceImpl implements AnalyticMoveLineService {
         } else {
           map.put(
               analyticDistributionLine.getAnalyticAxis(), analyticDistributionLine.getPercentage());
+        }
+      }
+      for (AnalyticAxis analyticAxis : map.keySet()) {
+        if (map.get(analyticAxis).compareTo(new BigDecimal(100)) > 0) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  @Override
+  public boolean validateAnalyticMoveLines(List<AnalyticMoveLine> analyticMoveLineList) {
+
+    if (analyticMoveLineList != null) {
+      Map<AnalyticAxis, BigDecimal> map = new HashMap<AnalyticAxis, BigDecimal>();
+      for (AnalyticMoveLine analyticMoveLine : analyticMoveLineList) {
+        if (map.containsKey(analyticMoveLine.getAnalyticAxis())) {
+          map.put(
+              analyticMoveLine.getAnalyticAxis(),
+              map.get(analyticMoveLine.getAnalyticAxis()).add(analyticMoveLine.getPercentage()));
+        } else {
+          map.put(analyticMoveLine.getAnalyticAxis(), analyticMoveLine.getPercentage());
         }
       }
       for (AnalyticAxis analyticAxis : map.keySet()) {

@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -36,7 +36,7 @@ public abstract class ThreadedJob implements Job {
       LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   @Override
-  @Transactional
+  @Transactional(rollbackOn = {Exception.class})
   public void execute(JobExecutionContext context) throws JobExecutionException {
     if (isRunning(context)) {
       return;
@@ -79,10 +79,7 @@ public abstract class ThreadedJob implements Job {
 
   private boolean isRunning(JobExecutionContext context) {
     try {
-      return context
-          .getScheduler()
-          .getCurrentlyExecutingJobs()
-          .stream()
+      return context.getScheduler().getCurrentlyExecutingJobs().stream()
           .anyMatch(
               j ->
                   j.getTrigger().equals(context.getTrigger())

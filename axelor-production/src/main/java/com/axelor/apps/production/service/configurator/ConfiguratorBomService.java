@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -22,18 +22,21 @@ import com.axelor.apps.production.db.BillOfMaterial;
 import com.axelor.apps.production.db.ConfiguratorBOM;
 import com.axelor.exception.AxelorException;
 import com.axelor.rpc.JsonContext;
+import java.util.Optional;
 
 public interface ConfiguratorBomService {
 
   /**
-   * Generate a bill of material from a configurator BOM and a JsonContext holding the custom values
+   * Generate a bill of materials from a configurator BOM and a JsonContext holding the custom
+   * values
    *
    * @param configuratorBOM
    * @param attributes
    * @param level
    * @param generatedProduct
+   * @return
    */
-  BillOfMaterial generateBillOfMaterial(
+  Optional<BillOfMaterial> generateBillOfMaterial(
       ConfiguratorBOM configuratorBOM, JsonContext attributes, int level, Product generatedProduct)
       throws AxelorException;
 }

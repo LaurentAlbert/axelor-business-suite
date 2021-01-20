@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -17,12 +17,15 @@
  */
 package com.axelor.apps.businessproduction.service;
 
+import com.axelor.apps.production.db.Machine;
+import com.axelor.apps.production.db.MachineTool;
 import com.axelor.apps.production.db.ManufOrder;
 import com.axelor.apps.production.db.OperationOrder;
 import com.axelor.apps.production.db.ProdHumanResource;
 import com.axelor.apps.production.db.ProdProcessLine;
 import com.axelor.apps.production.db.WorkCenter;
 import com.axelor.apps.production.db.repo.OperationOrderRepository;
+import com.axelor.apps.production.service.app.AppProductionService;
 import com.axelor.apps.production.service.operationorder.OperationOrderServiceImpl;
 import com.axelor.exception.AxelorException;
 import com.axelor.inject.Beans;
@@ -36,9 +39,14 @@ public class OperationOrderServiceBusinessImpl extends OperationOrderServiceImpl
   private final Logger logger = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   @Override
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public OperationOrder createOperationOrder(ManufOrder manufOrder, ProdProcessLine prodProcessLine)
       throws AxelorException {
+    AppProductionService appProductionService = Beans.get(AppProductionService.class);
+    if (!appProductionService.isApp("production")
+        || !appProductionService.getAppProduction().getManageBusinessProduction()) {
+      return super.createOperationOrder(manufOrder, prodProcessLine);
+    }
 
     OperationOrder operationOrder =
         this.createOperationOrder(
@@ -46,19 +54,21 @@ public class OperationOrderServiceBusinessImpl extends OperationOrderServiceImpl
             prodProcessLine.getPriority(),
             manufOrder.getIsToInvoice(),
             prodProcessLine.getWorkCenter(),
-            prodProcessLine.getWorkCenter(),
+            prodProcessLine.getWorkCenter().getMachine(),
+            prodProcessLine.getMachineTool(),
             prodProcessLine);
 
     return Beans.get(OperationOrderRepository.class).save(operationOrder);
   }
 
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional
   public OperationOrder createOperationOrder(
       ManufOrder manufOrder,
       int priority,
       boolean isToInvoice,
       WorkCenter workCenter,
-      WorkCenter machineWorkCenter,
+      Machine machine,
+      MachineTool machineTool,
       ProdProcessLine prodProcessLine)
       throws AxelorException {
 
@@ -74,19 +84,26 @@ public class OperationOrderServiceBusinessImpl extends OperationOrderServiceImpl
             operationName,
             manufOrder,
             workCenter,
-            machineWorkCenter,
+            machine,
             OperationOrderRepository.STATUS_DRAFT,
-            prodProcessLine);
+            prodProcessLine,
+            machineTool);
 
     operationOrder.setIsToInvoice(isToInvoice);
 
-    this._createHumanResourceList(operationOrder, machineWorkCenter);
+    this._createHumanResourceList(operationOrder, workCenter);
 
     return Beans.get(OperationOrderRepository.class).save(operationOrder);
   }
 
   @Override
   protected ProdHumanResource copyProdHumanResource(ProdHumanResource prodHumanResource) {
+    AppProductionService appProductionService = Beans.get(AppProductionService.class);
+
+    if (!appProductionService.isApp("production")
+        || !appProductionService.getAppProduction().getManageBusinessProduction()) {
+      return super.copyProdHumanResource(prodHumanResource);
+    }
 
     ProdHumanResource prodHumanResourceCopy =
         new ProdHumanResource(prodHumanResource.getProduct(), prodHumanResource.getDuration());

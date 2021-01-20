@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -22,6 +22,7 @@ import com.axelor.apps.account.db.InvoicePayment;
 import com.axelor.apps.account.db.PaymentMode;
 import com.axelor.apps.account.db.repo.InvoicePaymentRepository;
 import com.axelor.apps.account.db.repo.InvoiceRepository;
+import com.axelor.apps.account.service.move.MoveCustAccountService;
 import com.axelor.apps.account.service.payment.invoice.payment.InvoicePaymentCancelService;
 import com.axelor.apps.account.service.payment.invoice.payment.InvoicePaymentCreateService;
 import com.axelor.apps.account.service.payment.invoice.payment.InvoicePaymentToolService;
@@ -33,13 +34,13 @@ import com.axelor.apps.base.service.BankDetailsService;
 import com.axelor.apps.tool.StringTool;
 import com.axelor.common.ObjectUtils;
 import com.axelor.exception.AxelorException;
+import com.axelor.exception.ResponseMessageType;
 import com.axelor.exception.service.TraceBackService;
 import com.axelor.inject.Beans;
 import com.axelor.rpc.ActionRequest;
 import com.axelor.rpc.ActionResponse;
 import com.google.common.base.Function;
 import com.google.common.collect.Lists;
-import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import java.util.List;
 import java.util.Map;
@@ -48,14 +49,13 @@ import javax.annotation.Nullable;
 @Singleton
 public class InvoicePaymentController {
 
-  @Inject private InvoiceRepository invoiceRepo;
-
   public void cancelInvoicePayment(ActionRequest request, ActionResponse response) {
     InvoicePayment invoicePayment = request.getContext().asType(InvoicePayment.class);
 
     invoicePayment = Beans.get(InvoicePaymentRepository.class).find(invoicePayment.getId());
     try {
       Beans.get(InvoicePaymentCancelService.class).cancel(invoicePayment);
+      Beans.get(MoveCustAccountService.class).updateCustomerAccount(invoicePayment.getMove());
     } catch (Exception e) {
       TraceBackService.trace(response, e);
     }
@@ -67,7 +67,8 @@ public class InvoicePaymentController {
   @SuppressWarnings("unchecked")
   public void filterPaymentMode(ActionRequest request, ActionResponse response) {
     Map<String, Object> partialInvoice = (Map<String, Object>) request.getContext().get("_invoice");
-    Invoice invoice = invoiceRepo.find(Long.valueOf(partialInvoice.get("id").toString()));
+    Invoice invoice =
+        Beans.get(InvoiceRepository.class).find(Long.valueOf(partialInvoice.get("id").toString()));
     PaymentMode paymentMode = invoice.getPaymentMode();
     if (invoice != null && paymentMode != null) {
       if (paymentMode.getInOutSelect() != null) {
@@ -88,7 +89,8 @@ public class InvoicePaymentController {
     InvoicePayment invoicePayment = request.getContext().asType(InvoicePayment.class);
     Map<String, Object> partialInvoice = (Map<String, Object>) request.getContext().get("_invoice");
 
-    Invoice invoice = invoiceRepo.find(((Integer) partialInvoice.get("id")).longValue());
+    Invoice invoice =
+        Beans.get(InvoiceRepository.class).find(((Integer) partialInvoice.get("id")).longValue());
     Company company = invoice.getCompany();
     List<BankDetails> bankDetailsList =
         Beans.get(InvoicePaymentToolService.class)
@@ -115,7 +117,8 @@ public class InvoicePaymentController {
     InvoicePayment invoicePayment = request.getContext().asType(InvoicePayment.class);
     Map<String, Object> partialInvoice = (Map<String, Object>) request.getContext().get("_invoice");
 
-    Invoice invoice = invoiceRepo.find(((Integer) partialInvoice.get("id")).longValue());
+    Invoice invoice =
+        Beans.get(InvoiceRepository.class).find(((Integer) partialInvoice.get("id")).longValue());
     PaymentMode paymentMode = invoicePayment.getPaymentMode();
     Company company = invoice.getCompany();
     List<BankDetails> bankDetailsList =
@@ -169,5 +172,21 @@ public class InvoicePaymentController {
       TraceBackService.trace(response, e);
     }
     response.setReload(true);
+  }
+
+  /**
+   * Method that check the invoice payment before save and save. Only use when add payment is used
+   * in invoice
+   *
+   * @param request
+   * @param response
+   */
+  public void checkConditionBeforeSave(ActionRequest request, ActionResponse response) {
+    try {
+      InvoicePayment invoicePayment = request.getContext().asType(InvoicePayment.class);
+      Beans.get(InvoicePaymentToolService.class).checkConditionBeforeSave(invoicePayment);
+    } catch (Exception e) {
+      TraceBackService.trace(response, e, ResponseMessageType.ERROR);
+    }
   }
 }

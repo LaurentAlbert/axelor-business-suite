@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -66,7 +66,7 @@ public class BankReconciliationValidateService {
     this.bankReconciliationLineService = bankReconciliationLineService;
   }
 
-  @Transactional(rollbackOn = {AxelorException.class, RuntimeException.class})
+  @Transactional(rollbackOn = {Exception.class})
   public void validate(BankReconciliation bankReconciliation) throws AxelorException {
 
     // TODO CHECK should be done on all, before generate any moves.
@@ -89,7 +89,8 @@ public class BankReconciliationValidateService {
 
     bankReconciliation.setStatusSelect(BankReconciliationRepository.STATUS_VALIDATED);
     bankReconciliation.setValidatedByUser(AuthUtils.getUser());
-    bankReconciliation.setValidatedDate(Beans.get(AppBaseService.class).getTodayDate());
+    bankReconciliation.setValidatedDate(
+        Beans.get(AppBaseService.class).getTodayDate(bankReconciliation.getCompany()));
 
     bankReconciliationRepository.save(bankReconciliation);
   }
@@ -120,7 +121,7 @@ public class BankReconciliationValidateService {
 
     String origin = bankReconciliation.getName() + reference != null ? " - " + reference : "";
 
-    boolean sign = credit.compareTo(BigDecimal.ZERO) > 0;
+    boolean isDebit = debit.compareTo(BigDecimal.ZERO) > 0;
 
     Move move =
         moveService
@@ -140,7 +141,7 @@ public class BankReconciliationValidateService {
             partner,
             bankReconciliationLine.getAccount(),
             amount,
-            sign,
+            isDebit,
             effectDate,
             effectDate,
             1,
@@ -154,7 +155,7 @@ public class BankReconciliationValidateService {
             partner,
             bankReconciliation.getCashAccount(),
             amount,
-            !sign,
+            !isDebit,
             effectDate,
             effectDate,
             2,
@@ -193,7 +194,7 @@ public class BankReconciliationValidateService {
     moveLine.setBankReconciledAmount(bankReconciledAmount);
   }
 
-  @Transactional(rollbackOn = {AxelorException.class, RuntimeException.class})
+  @Transactional(rollbackOn = {Exception.class})
   public void validateMultipleBankReconciles(
       BankReconciliation bankReconciliation,
       BankReconciliationLine bankReconciliationLine,

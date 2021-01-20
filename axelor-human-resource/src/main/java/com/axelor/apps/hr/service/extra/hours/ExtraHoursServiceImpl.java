@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -54,7 +54,7 @@ public class ExtraHoursServiceImpl implements ExtraHoursService {
     this.templateMessageService = templateMessageService;
   }
 
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public void cancel(ExtraHours extraHours) throws AxelorException {
 
     extraHours.setStatusSelect(ExtraHoursRepository.STATUS_CANCELED);
@@ -76,11 +76,11 @@ public class ExtraHoursServiceImpl implements ExtraHoursService {
     return null;
   }
 
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public void confirm(ExtraHours extraHours) throws AxelorException {
 
     extraHours.setStatusSelect(ExtraHoursRepository.STATUS_CONFIRMED);
-    extraHours.setSentDate(appBaseService.getTodayDate());
+    extraHours.setSentDate(appBaseService.getTodayDate(extraHours.getCompany()));
 
     extraHoursRepo.save(extraHours);
   }
@@ -100,12 +100,12 @@ public class ExtraHoursServiceImpl implements ExtraHoursService {
     return null;
   }
 
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public void validate(ExtraHours extraHours) throws AxelorException {
 
     extraHours.setStatusSelect(ExtraHoursRepository.STATUS_VALIDATED);
     extraHours.setValidatedBy(AuthUtils.getUser());
-    extraHours.setValidationDate(appBaseService.getTodayDate());
+    extraHours.setValidationDate(appBaseService.getTodayDate(extraHours.getCompany()));
 
     extraHoursRepo.save(extraHours);
   }
@@ -125,12 +125,12 @@ public class ExtraHoursServiceImpl implements ExtraHoursService {
     return null;
   }
 
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public void refuse(ExtraHours extraHours) throws AxelorException {
 
     extraHours.setStatusSelect(ExtraHoursRepository.STATUS_REFUSED);
     extraHours.setRefusedBy(AuthUtils.getUser());
-    extraHours.setRefusalDate(appBaseService.getTodayDate());
+    extraHours.setRefusalDate(appBaseService.getTodayDate(extraHours.getCompany()));
 
     extraHoursRepo.save(extraHours);
   }

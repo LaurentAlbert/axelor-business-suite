@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -43,8 +43,6 @@ import com.axelor.meta.schema.actions.ActionView;
 import com.axelor.rpc.ActionRequest;
 import com.axelor.rpc.ActionResponse;
 import com.axelor.rpc.Context;
-import com.google.common.base.Function;
-import com.google.common.collect.Lists;
 import com.google.inject.Singleton;
 import java.lang.invoke.MethodHandles;
 import java.math.BigDecimal;
@@ -56,7 +54,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import javax.annotation.Nullable;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,37 +64,59 @@ public class StockMoveController {
   private final Logger logger = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   public void plan(ActionRequest request, ActionResponse response) {
-
-    StockMove stockMove = request.getContext().asType(StockMove.class);
     try {
+      StockMove stockMove = request.getContext().asType(StockMove.class);
+      // we have to inject TraceBackService to use non static methods
+      TraceBackService traceBackService = Beans.get(TraceBackService.class);
+      long tracebackCount = traceBackService.countMessageTraceBack(stockMove);
       Beans.get(StockMoveService.class)
           .plan(Beans.get(StockMoveRepository.class).find(stockMove.getId()));
       response.setReload(true);
+      if (traceBackService.countMessageTraceBack(stockMove) > tracebackCount) {
+        traceBackService
+            .findLastMessageTraceBack(stockMove)
+            .ifPresent(
+                traceback ->
+                    response.setNotify(
+                        String.format(
+                            I18n.get(
+                                com.axelor.apps.message.exception.IExceptionMessage
+                                    .SEND_EMAIL_EXCEPTION),
+                            traceback.getMessage())));
+      }
     } catch (Exception e) {
       TraceBackService.trace(response, e);
     }
   }
 
   public void manageBackorder(ActionRequest request, ActionResponse response) {
-    StockMove stockMove = request.getContext().asType(StockMove.class);
-    response.setView(
-        ActionView.define(I18n.get("Manage backorder?"))
-            .model(StockMove.class.getName())
-            .add("form", "popup-stock-move-backorder-form")
-            .param("popup", "reload")
-            .param("show-toolbar", "false")
-            .param("show-confirm", "false")
-            .param("popup-save", "false")
-            .context("_showRecord", stockMove.getId())
-            .map());
+    try {
+
+      StockMove stockMove = request.getContext().asType(StockMove.class);
+      response.setView(
+          ActionView.define(I18n.get("Manage backorder?"))
+              .model(StockMove.class.getName())
+              .add("form", "popup-stock-move-backorder-form")
+              .param("popup", "reload")
+              .param("show-toolbar", "false")
+              .param("show-confirm", "false")
+              .param("popup-save", "false")
+              .context("_showRecord", stockMove.getId())
+              .map());
+    } catch (Exception e) {
+      TraceBackService.trace(response, e);
+    }
   }
 
   public void realize(ActionRequest request, ActionResponse response) {
 
-    StockMove stockMoveFromRequest = request.getContext().asType(StockMove.class);
-
     try {
+      StockMove stockMoveFromRequest = request.getContext().asType(StockMove.class);
+
       StockMove stockMove = Beans.get(StockMoveRepository.class).find(stockMoveFromRequest.getId());
+      // we have to inject TraceBackService to use non static methods
+      TraceBackService traceBackService = Beans.get(TraceBackService.class);
+      long tracebackCount = traceBackService.countMessageTraceBack(stockMove);
       String newSeq = Beans.get(StockMoveService.class).realize(stockMove);
 
       response.setReload(true);
@@ -114,15 +134,27 @@ public class StockMoveController {
           response.setFlash(String.format(I18n.get(IExceptionMessage.STOCK_MOVE_9), newSeq));
         }
       }
+      if (traceBackService.countMessageTraceBack(stockMove) > tracebackCount) {
+        traceBackService
+            .findLastMessageTraceBack(stockMove)
+            .ifPresent(
+                traceback ->
+                    response.setNotify(
+                        String.format(
+                            I18n.get(
+                                com.axelor.apps.message.exception.IExceptionMessage
+                                    .SEND_EMAIL_EXCEPTION),
+                            traceback.getMessage())));
+      }
     } catch (Exception e) {
       TraceBackService.trace(response, e);
     }
   }
 
   public void draft(ActionRequest request, ActionResponse response) {
-    StockMove stockMove = request.getContext().asType(StockMove.class);
-
     try {
+      StockMove stockMove = request.getContext().asType(StockMove.class);
+
       Beans.get(StockMoveService.class)
           .goBackToDraft(Beans.get(StockMoveRepository.class).find(stockMove.getId()));
       response.setReload(true);
@@ -132,9 +164,9 @@ public class StockMoveController {
   }
 
   public void cancel(ActionRequest request, ActionResponse response) {
-    StockMove stockMove = request.getContext().asType(StockMove.class);
-
     try {
+      StockMove stockMove = request.getContext().asType(StockMove.class);
+
       Beans.get(StockMoveService.class)
           .cancel(
               Beans.get(StockMoveRepository.class).find(stockMove.getId()),
@@ -153,24 +185,21 @@ public class StockMoveController {
    */
   @SuppressWarnings("unchecked")
   public void printStockMove(ActionRequest request, ActionResponse response) {
-    Context context = request.getContext();
-    String fileLink;
-    String title;
-
     try {
+      Context context = request.getContext();
+      String fileLink;
+      String title;
+
       StockMovePrintService stockMovePrintService = Beans.get(StockMovePrintService.class);
 
       if (!ObjectUtils.isEmpty(request.getContext().get("_ids"))) {
         List<Long> ids =
-            Lists.transform(
-                (List) request.getContext().get("_ids"),
-                new Function<Object, Long>() {
-                  @Nullable
-                  @Override
-                  public Long apply(@Nullable Object input) {
-                    return Long.parseLong(input.toString());
-                  }
-                });
+            (List)
+                (((List) context.get("_ids"))
+                    .stream()
+                        .filter(ObjectUtils::notEmpty)
+                        .map(input -> Long.parseLong(input.toString()))
+                        .collect(Collectors.toList()));
         fileLink = stockMovePrintService.printStockMoves(ids);
         title = I18n.get("Stock Moves");
       } else if (context.get("id") != null) {
@@ -198,27 +227,23 @@ public class StockMoveController {
    */
   @SuppressWarnings("unchecked")
   public void printPickingStockMove(ActionRequest request, ActionResponse response) {
-    Context context = request.getContext();
-    String fileLink;
-    String title;
-    String userType = (String) context.get("_userType");
-
     try {
+      Context context = request.getContext();
+      String fileLink;
+      String title;
+      String userType = (String) context.get("_userType");
 
       PickingStockMovePrintService pickingstockMovePrintService =
           Beans.get(PickingStockMovePrintService.class);
 
       if (!ObjectUtils.isEmpty(context.get("_ids"))) {
         List<Long> ids =
-            Lists.transform(
-                (List) context.get("_ids"),
-                new Function<Object, Long>() {
-                  @Nullable
-                  @Override
-                  public Long apply(@Nullable Object input) {
-                    return Long.parseLong(input.toString());
-                  }
-                });
+            (List)
+                (((List) context.get("_ids"))
+                    .stream()
+                        .filter(ObjectUtils::notEmpty)
+                        .map(input -> Long.parseLong(input.toString()))
+                        .collect(Collectors.toList()));
         fileLink = pickingstockMovePrintService.printStockMoves(ids, userType);
         title = I18n.get("Stock Moves");
       } else if (context.get("id") != null) {
@@ -249,26 +274,22 @@ public class StockMoveController {
    */
   @SuppressWarnings("unchecked")
   public void printConformityCertificate(ActionRequest request, ActionResponse response) {
-    Context context = request.getContext();
-    String fileLink;
-    String title;
-
     try {
+      Context context = request.getContext();
+      String fileLink;
+      String title;
 
       ConformityCertificatePrintService conformityCertificatePrintService =
           Beans.get(ConformityCertificatePrintService.class);
 
       if (!ObjectUtils.isEmpty(context.get("_ids"))) {
         List<Long> ids =
-            Lists.transform(
-                (List) context.get("_ids"),
-                new Function<Object, Long>() {
-                  @Nullable
-                  @Override
-                  public Long apply(@Nullable Object input) {
-                    return Long.parseLong(input.toString());
-                  }
-                });
+            (List)
+                (((List) context.get("_ids"))
+                    .stream()
+                        .filter(ObjectUtils::notEmpty)
+                        .map(input -> Long.parseLong(input.toString()))
+                        .collect(Collectors.toList()));
         fileLink = conformityCertificatePrintService.printConformityCertificates(ids);
         title = I18n.get("Conformity Certificates");
       } else if (context.get("id") != null) {
@@ -279,7 +300,7 @@ public class StockMoveController {
             conformityCertificatePrintService.printConformityCertificate(
                 stockMove, ReportSettings.FORMAT_PDF);
 
-        logger.debug("Printing " + title);
+        logger.debug("Printing {}", title);
       } else {
         throw new AxelorException(
             TraceBackRepository.CATEGORY_MISSING_FIELD,
@@ -293,8 +314,8 @@ public class StockMoveController {
 
   public void viewDirection(ActionRequest request, ActionResponse response) {
 
-    StockMove stockMove = request.getContext().asType(StockMove.class);
     try {
+      StockMove stockMove = request.getContext().asType(StockMove.class);
       Map<String, Object> result = Beans.get(StockMoveService.class).viewDirection(stockMove);
       Map<String, Object> mapView = new HashMap<>();
       mapView.put("title", I18n.get("Map"));
@@ -308,19 +329,25 @@ public class StockMoveController {
 
   @SuppressWarnings("unchecked")
   public void splitStockMoveLinesUnit(ActionRequest request, ActionResponse response) {
-    List<StockMoveLine> stockMoveLines =
-        (List<StockMoveLine>) request.getContext().get("stockMoveLineList");
-    if (stockMoveLines == null) {
-      response.setFlash(I18n.get(IExceptionMessage.STOCK_MOVE_14));
-      return;
-    }
-    Boolean selected =
-        Beans.get(StockMoveService.class)
-            .splitStockMoveLinesUnit(stockMoveLines, new BigDecimal(1));
+    try {
+      List<StockMoveLine> stockMoveLines =
+          (List<StockMoveLine>) request.getContext().get("stockMoveLineList");
+      if (stockMoveLines == null) {
+        response.setFlash(I18n.get(IExceptionMessage.STOCK_MOVE_14));
+        return;
+      }
+      boolean selected =
+          Beans.get(StockMoveService.class)
+              .splitStockMoveLinesUnit(stockMoveLines, new BigDecimal(1));
 
-    if (!selected) response.setFlash(I18n.get(IExceptionMessage.STOCK_MOVE_15));
-    response.setReload(true);
-    response.setCanClose(true);
+      if (!selected) {
+        response.setFlash(I18n.get(IExceptionMessage.STOCK_MOVE_15));
+      }
+      response.setReload(true);
+      response.setCanClose(true);
+    } catch (Exception e) {
+      TraceBackService.trace(response, e);
+    }
   }
 
   @SuppressWarnings({"unchecked", "rawtypes"})
@@ -337,7 +364,7 @@ public class StockMoveController {
       List<StockMoveLine> stockMoveLineList = new ArrayList<>();
       StockMoveLineRepository stockMoveLineRepo = Beans.get(StockMoveLineRepository.class);
       for (HashMap map : selectedStockMoveLineMapList) {
-        StockMoveLine stockMoveLine = (StockMoveLine) Mapper.toBean(StockMoveLine.class, map);
+        StockMoveLine stockMoveLine = Mapper.toBean(StockMoveLine.class, map);
         stockMoveLineList.add(stockMoveLineRepo.find(stockMoveLine.getId()));
       }
 
@@ -346,7 +373,10 @@ public class StockMoveController {
         return;
       }
 
-      BigDecimal splitQty = new BigDecimal(request.getContext().get("splitQty").toString());
+      BigDecimal splitQty = null;
+      if (request.getContext().containsKey("splitQty")) {
+        splitQty = new BigDecimal(request.getContext().get("splitQty").toString());
+      }
       if (splitQty == null || splitQty.compareTo(BigDecimal.ZERO) < 1) {
         response.setFlash(I18n.get(IExceptionMessage.STOCK_MOVE_16));
         return;
@@ -363,17 +393,21 @@ public class StockMoveController {
   }
 
   public void shipReciveAllProducts(ActionRequest request, ActionResponse response) {
-    StockMove stockMove = request.getContext().asType(StockMove.class);
-    Beans.get(StockMoveService.class)
-        .copyQtyToRealQty(Beans.get(StockMoveRepository.class).find(stockMove.getId()));
-    response.setReload(true);
+    try {
+      StockMove stockMove = request.getContext().asType(StockMove.class);
+      Beans.get(StockMoveService.class)
+          .copyQtyToRealQty(Beans.get(StockMoveRepository.class).find(stockMove.getId()));
+      response.setReload(true);
+    } catch (Exception e) {
+      TraceBackService.trace(response, e);
+    }
   }
 
   public void generateReversion(ActionRequest request, ActionResponse response) {
 
-    StockMove stockMove = request.getContext().asType(StockMove.class);
-
     try {
+      StockMove stockMove = request.getContext().asType(StockMove.class);
+
       Optional<StockMove> reversion =
           Beans.get(StockMoveService.class)
               .generateReversion(Beans.get(StockMoveRepository.class).find(stockMove.getId()));
@@ -383,6 +417,7 @@ public class StockMoveController {
                 .model(StockMove.class.getName())
                 .add("grid", "stock-move-grid")
                 .add("form", "stock-move-form")
+                .param("search-filters", "internal-stock-move-filters")
                 .param("forceEdit", "true")
                 .context("_showRecord", String.valueOf(reversion.get().getId()))
                 .map());
@@ -395,10 +430,10 @@ public class StockMoveController {
   }
 
   public void splitInto2(ActionRequest request, ActionResponse response) {
-    StockMove stockMove = request.getContext().asType(StockMove.class);
-    List<StockMoveLine> modifiedStockMoveLineList = stockMove.getStockMoveLineList();
-    stockMove = Beans.get(StockMoveRepository.class).find(stockMove.getId());
     try {
+      StockMove stockMove = request.getContext().asType(StockMove.class);
+      List<StockMoveLine> modifiedStockMoveLineList = stockMove.getStockMoveLineList();
+      stockMove = Beans.get(StockMoveRepository.class).find(stockMove.getId());
       StockMove newStockMove =
           Beans.get(StockMoveService.class).splitInto2(stockMove, modifiedStockMoveLineList);
 
@@ -412,6 +447,7 @@ public class StockMoveController {
                 .model(StockMove.class.getName())
                 .add("grid", "stock-move-grid")
                 .add("form", "stock-move-form")
+                .param("search-filters", "internal-stock-move-filters")
                 .param("forceEdit", "true")
                 .context("_showRecord", String.valueOf(newStockMove.getId()))
                 .map());
@@ -422,66 +458,85 @@ public class StockMoveController {
   }
 
   public void changeConformityStockMove(ActionRequest request, ActionResponse response) {
-    StockMove stockMove = request.getContext().asType(StockMove.class);
+    try {
 
-    response.setValue(
-        "stockMoveLineList",
-        Beans.get(StockMoveService.class).changeConformityStockMove(stockMove));
+      StockMove stockMove = request.getContext().asType(StockMove.class);
+
+      response.setValue(
+          "stockMoveLineList",
+          Beans.get(StockMoveService.class).changeConformityStockMove(stockMove));
+    } catch (Exception e) {
+      TraceBackService.trace(response, e);
+    }
   }
 
   public void changeConformityStockMoveLine(ActionRequest request, ActionResponse response) {
-    StockMove stockMove = request.getContext().asType(StockMove.class);
+    try {
+      StockMove stockMove = request.getContext().asType(StockMove.class);
 
-    response.setValue(
-        "conformitySelect",
-        Beans.get(StockMoveService.class).changeConformityStockMoveLine(stockMove));
+      response.setValue(
+          "conformitySelect",
+          Beans.get(StockMoveService.class).changeConformityStockMoveLine(stockMove));
+    } catch (Exception e) {
+      TraceBackService.trace(response, e);
+    }
   }
 
   public void compute(ActionRequest request, ActionResponse response) {
-
-    StockMove stockMove = request.getContext().asType(StockMove.class);
-    response.setValue("exTaxTotal", Beans.get(StockMoveToolService.class).compute(stockMove));
+    try {
+      StockMove stockMove = request.getContext().asType(StockMove.class);
+      response.setValue("exTaxTotal", Beans.get(StockMoveToolService.class).compute(stockMove));
+    } catch (Exception e) {
+      TraceBackService.trace(response, e);
+    }
   }
 
   public void openStockPerDay(ActionRequest request, ActionResponse response) {
+    try {
+      Context context = request.getContext();
 
-    Context context = request.getContext();
+      Long locationId =
+          Long.parseLong(((Map<String, Object>) context.get("stockLocation")).get("id").toString());
+      LocalDate fromDate = LocalDate.parse(context.get("stockFromDate").toString());
+      LocalDate toDate = LocalDate.parse(context.get("stockToDate").toString());
 
-    Long locationId =
-        Long.parseLong(((Map<String, Object>) context.get("stockLocation")).get("id").toString());
-    LocalDate fromDate = LocalDate.parse(context.get("stockFromDate").toString());
-    LocalDate toDate = LocalDate.parse(context.get("stockToDate").toString());
+      Collection<Map<String, Object>> products =
+          (Collection<Map<String, Object>>) context.get("productSet");
 
-    Collection<Map<String, Object>> products =
-        (Collection<Map<String, Object>>) context.get("productSet");
+      String domain = null;
+      List<Object> productIds = null;
+      if (products != null && !products.isEmpty()) {
+        productIds = Arrays.asList(products.stream().map(p -> p.get("id")).toArray());
+        domain = "self.id in (:productIds)";
+      }
 
-    String domain = null;
-    List<Object> productIds = null;
-    if (products != null && !products.isEmpty()) {
-      productIds = Arrays.asList(products.stream().map(p -> p.get("id")).toArray());
-      domain = "self.id in (:productIds)";
+      response.setView(
+          ActionView.define(I18n.get("Stocks"))
+              .model(Product.class.getName())
+              .add("cards", "stock-product-cards")
+              .add("grid", "stock-product-grid")
+              .add("form", "stock-product-form")
+              .domain(domain)
+              .context("fromStockWizard", true)
+              .context("productIds", productIds)
+              .context("stockFromDate", fromDate)
+              .context("stockToDate", toDate)
+              .context("locationId", locationId)
+              .map());
+    } catch (Exception e) {
+      TraceBackService.trace(response, e);
     }
-
-    response.setView(
-        ActionView.define(I18n.get("Stocks"))
-            .model(Product.class.getName())
-            .add("cards", "stock-product-cards")
-            .add("grid", "stock-product-grid")
-            .add("form", "stock-product-form")
-            .domain(domain)
-            .context("fromStockWizard", true)
-            .context("productIds", productIds)
-            .context("stockFromDate", fromDate)
-            .context("stockToDate", toDate)
-            .context("locationId", locationId)
-            .map());
   }
 
   public void fillAddressesStr(ActionRequest request, ActionResponse response) {
-    StockMove stockMove = request.getContext().asType(StockMove.class);
-    Beans.get(StockMoveToolService.class).computeAddressStr(stockMove);
+    try {
+      StockMove stockMove = request.getContext().asType(StockMove.class);
+      Beans.get(StockMoveToolService.class).computeAddressStr(stockMove);
 
-    response.setValues(stockMove);
+      response.setValues(stockMove);
+    } catch (Exception e) {
+      TraceBackService.trace(response, e);
+    }
   }
 
   /**
@@ -491,19 +546,23 @@ public class StockMoveController {
    * @param response
    */
   public void filterPrintingSettings(ActionRequest request, ActionResponse response) {
-    StockMove stockMove = request.getContext().asType(StockMove.class);
+    try {
+      StockMove stockMove = request.getContext().asType(StockMove.class);
 
-    List<PrintingSettings> printingSettingsList =
-        Beans.get(TradingNameService.class)
-            .getPrintingSettingsList(stockMove.getTradingName(), stockMove.getCompany());
-    String domain =
-        String.format(
-            "self.id IN (%s)",
-            !printingSettingsList.isEmpty()
-                ? StringTool.getIdListString(printingSettingsList)
-                : "0");
+      List<PrintingSettings> printingSettingsList =
+          Beans.get(TradingNameService.class)
+              .getPrintingSettingsList(stockMove.getTradingName(), stockMove.getCompany());
+      String domain =
+          String.format(
+              "self.id IN (%s)",
+              !printingSettingsList.isEmpty()
+                  ? StringTool.getIdListString(printingSettingsList)
+                  : "0");
 
-    response.setAttr("printingSettings", "domain", domain);
+      response.setAttr("printingSettings", "domain", domain);
+    } catch (Exception e) {
+      TraceBackService.trace(response, e);
+    }
   }
 
   /**
@@ -525,19 +584,27 @@ public class StockMoveController {
   }
 
   public void setAvailableStatus(ActionRequest request, ActionResponse response) {
-    StockMove stockMove = request.getContext().asType(StockMove.class);
-    Beans.get(StockMoveService.class).setAvailableStatus(stockMove);
-    response.setValue("stockMoveLineList", stockMove.getStockMoveLineList());
+    try {
+      StockMove stockMove = request.getContext().asType(StockMove.class);
+      Beans.get(StockMoveService.class).setAvailableStatus(stockMove);
+      response.setValue("stockMoveLineList", stockMove.getStockMoveLineList());
+    } catch (Exception e) {
+      TraceBackService.trace(response, e);
+    }
   }
 
   public void updateMoveLineFilterOnAvailableproduct(
       ActionRequest request, ActionResponse response) {
-    StockMove stockMove = request.getContext().asType(StockMove.class);
-    if (stockMove.getStockMoveLineList() != null) {
-      for (StockMoveLine stockMoveLine : stockMove.getStockMoveLineList()) {
-        stockMoveLine.setFilterOnAvailableProducts(stockMove.getFilterOnAvailableProducts());
+    try {
+      StockMove stockMove = request.getContext().asType(StockMove.class);
+      if (stockMove.getStockMoveLineList() != null) {
+        for (StockMoveLine stockMoveLine : stockMove.getStockMoveLineList()) {
+          stockMoveLine.setFilterOnAvailableProducts(stockMove.getFilterOnAvailableProducts());
+        }
+        response.setValue("stockMoveLineList", stockMove.getStockMoveLineList());
       }
-      response.setValue("stockMoveLineList", stockMove.getStockMoveLineList());
+    } catch (Exception e) {
+      TraceBackService.trace(response, e);
     }
   }
 
@@ -553,7 +620,6 @@ public class StockMoveController {
       StockMove stockMove = request.getContext().asType(StockMove.class);
       Beans.get(StockMoveService.class)
           .updateStocks(Beans.get(StockMoveRepository.class).find(stockMove.getId()));
-      response.setReload(true);
     } catch (Exception e) {
       TraceBackService.trace(response, e);
     }

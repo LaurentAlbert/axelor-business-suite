@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -19,6 +19,7 @@ package com.axelor.apps.account.service;
 
 import com.axelor.apps.account.db.Account;
 import com.axelor.apps.account.db.AccountConfig;
+import com.axelor.apps.account.db.AccountType;
 import com.axelor.apps.account.db.AccountingSituation;
 import com.axelor.apps.account.db.PaymentMode;
 import com.axelor.apps.account.db.repo.AccountConfigRepository;
@@ -76,7 +77,7 @@ public class AccountingSituationServiceImpl implements AccountingSituationServic
   }
 
   @Override
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public List<AccountingSituation> createAccountingSituation(Partner partner)
       throws AxelorException {
     Set<Company> companySet = partner.getCompanySet();
@@ -93,7 +94,7 @@ public class AccountingSituationServiceImpl implements AccountingSituationServic
   }
 
   @Override
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public AccountingSituation createAccountingSituation(Partner partner, Company company)
       throws AxelorException {
     AccountingSituation accountingSituation = new AccountingSituation();
@@ -135,7 +136,8 @@ public class AccountingSituationServiceImpl implements AccountingSituationServic
     }
 
     for (AccountingSituation accountingSituation : partner.getAccountingSituationList()) {
-      if (accountingSituation.getCompany().equals(company)) {
+      if (accountingSituation.getCompany() != null
+          && accountingSituation.getCompany().equals(company)) {
         return accountingSituation;
       }
     }
@@ -144,7 +146,7 @@ public class AccountingSituationServiceImpl implements AccountingSituationServic
   }
 
   @Override
-  @Transactional(rollbackOn = {AxelorException.class, Exception.class})
+  @Transactional(rollbackOn = {Exception.class})
   public void createPartnerAccounts(AccountingSituation situation) throws AxelorException {
     AccountConfig accountConfig = situation.getCompany().getAccountConfig();
     int creationMode;
@@ -203,15 +205,15 @@ public class AccountingSituationServiceImpl implements AccountingSituationServic
           situation.getCompany().getName());
     }
 
-    Account account = new Account();
-    account.setName(partner.getFullName());
-    account.setCode(accountCode);
-    account.setParentAccount(accountConfig.getCustomerAccount());
-    account.setAccountType(accountConfig.getCustomerAccount().getAccountType());
-    account.setReconcileOk(true);
-    account.setCompany(situation.getCompany());
-    account.setUseForPartnerBalance(true);
-    account.setCompatibleAccountSet(new HashSet<>());
+    Account account =
+        this.createAccount(
+            partner.getFullName(),
+            accountCode,
+            accountConfig.getCustomerAccount(),
+            accountConfig.getCustomerAccount().getAccountType(),
+            true,
+            situation.getCompany(),
+            true);
     situation.setCustomerAccount(account);
   }
 
@@ -260,15 +262,15 @@ public class AccountingSituationServiceImpl implements AccountingSituationServic
           situation.getCompany().getName());
     }
 
-    Account account = new Account();
-    account.setName(partner.getFullName());
-    account.setCode(accountCode);
-    account.setParentAccount(accountConfig.getSupplierAccount());
-    account.setAccountType(accountConfig.getSupplierAccount().getAccountType());
-    account.setReconcileOk(true);
-    account.setCompany(situation.getCompany());
-    account.setUseForPartnerBalance(true);
-    account.setCompatibleAccountSet(new HashSet<>());
+    Account account =
+        this.createAccount(
+            partner.getFullName(),
+            accountCode,
+            accountConfig.getSupplierAccount(),
+            accountConfig.getSupplierAccount().getAccountType(),
+            true,
+            situation.getCompany(),
+            true);
     situation.setSupplierAccount(account);
   }
 
@@ -316,15 +318,15 @@ public class AccountingSituationServiceImpl implements AccountingSituationServic
           situation.getCompany().getName());
     }
 
-    Account account = new Account();
-    account.setName(partner.getFullName());
-    account.setCode(accountCode);
-    account.setParentAccount(accountConfig.getEmployeeAccount());
-    account.setAccountType(accountConfig.getEmployeeAccount().getAccountType());
-    account.setReconcileOk(true);
-    account.setCompany(situation.getCompany());
-    account.setUseForPartnerBalance(true);
-    account.setCompatibleAccountSet(new HashSet<>());
+    Account account =
+        this.createAccount(
+            partner.getFullName(),
+            accountCode,
+            accountConfig.getEmployeeAccount(),
+            accountConfig.getEmployeeAccount().getAccountType(),
+            true,
+            situation.getCompany(),
+            true);
     situation.setEmployeeAccount(account);
   }
 
@@ -339,7 +341,7 @@ public class AccountingSituationServiceImpl implements AccountingSituationServic
   protected String getPrefixedAccountCode(String prefix, Partner partner) {
     return (prefix + StringUtils.stripAccent(partner.getFullName()))
         .toUpperCase()
-        .replaceAll("[^A-Z]", "");
+        .replaceAll("[^A-Z0-9]", "");
   }
 
   /**
@@ -445,5 +447,27 @@ public class AccountingSituationServiceImpl implements AccountingSituationServic
     }
 
     return company.getDefaultBankDetails();
+  }
+
+  protected Account createAccount(
+      String fullName,
+      String accountCode,
+      Account parentAccount,
+      AccountType accountType,
+      boolean reconcileOk,
+      Company company,
+      boolean useForPartnerBalance) {
+
+    Account account = new Account();
+    account.setName(fullName);
+    account.setCode(accountCode);
+    account.setParentAccount(parentAccount);
+    account.setAccountType(accountType);
+    account.setReconcileOk(reconcileOk);
+    account.setCompany(company);
+    account.setUseForPartnerBalance(useForPartnerBalance);
+    account.setCompatibleAccountSet(new HashSet<>());
+
+    return account;
   }
 }

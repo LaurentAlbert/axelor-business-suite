@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2021 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -118,52 +118,6 @@ public class HRConfigService {
           hrConfig.getCompany().getName());
     }
     return refusedExpenseTemplate;
-  }
-
-  // TIMESHEET
-
-  public Template getSentTimesheetTemplate(HRConfig hrConfig) throws AxelorException {
-    Template sentTimesheetTemplate = hrConfig.getSentTimesheetTemplate();
-    if (sentTimesheetTemplate == null) {
-      throw new AxelorException(
-          TraceBackRepository.CATEGORY_CONFIGURATION_ERROR,
-          I18n.get(IExceptionMessage.HR_CONFIG_SENT_TIMESHEET_TEMPLATE),
-          hrConfig.getCompany().getName());
-    }
-    return sentTimesheetTemplate;
-  }
-
-  public Template getValidatedTimesheetTemplate(HRConfig hrConfig) throws AxelorException {
-    Template validatedTimesheetTemplate = hrConfig.getValidatedTimesheetTemplate();
-    if (validatedTimesheetTemplate == null) {
-      throw new AxelorException(
-          TraceBackRepository.CATEGORY_CONFIGURATION_ERROR,
-          I18n.get(IExceptionMessage.HR_CONFIG_VALIDATED_TIMESHEET_TEMPLATE),
-          hrConfig.getCompany().getName());
-    }
-    return validatedTimesheetTemplate;
-  }
-
-  public Template getRefusedTimesheetTemplate(HRConfig hrConfig) throws AxelorException {
-    Template refusedTimesheetTemplate = hrConfig.getRefusedTimesheetTemplate();
-    if (refusedTimesheetTemplate == null) {
-      throw new AxelorException(
-          TraceBackRepository.CATEGORY_CONFIGURATION_ERROR,
-          I18n.get(IExceptionMessage.HR_CONFIG_REFUSED_TIMESHEET_TEMPLATE),
-          hrConfig.getCompany().getName());
-    }
-    return refusedTimesheetTemplate;
-  }
-
-  public Template getCanceledTimesheetTemplate(HRConfig hrConfig) throws AxelorException {
-    Template refusedTimesheetTemplate = hrConfig.getCanceledTimesheetTemplate();
-    if (refusedTimesheetTemplate == null) {
-      throw new AxelorException(
-          TraceBackRepository.CATEGORY_CONFIGURATION_ERROR,
-          I18n.get(IExceptionMessage.HR_CONFIG_CANCELED_TIMESHEET_TEMPLATE),
-          hrConfig.getCompany().getName());
-    }
-    return refusedTimesheetTemplate;
   }
 
   // LEAVE REQUEST

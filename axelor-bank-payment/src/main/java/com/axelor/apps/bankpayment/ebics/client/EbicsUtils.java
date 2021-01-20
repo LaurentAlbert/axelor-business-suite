@@ -1,7 +1,7 @@
 /*
  * Axelor Business Solutions
  *
- * Copyright (C) 2019 Axelor (<http://axelor.com>).
+ * Copyright (C) 2020 Axelor (<http://axelor.com>).
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -35,6 +35,7 @@ import java.util.zip.Inflater;
 import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import org.apache.xml.security.c14n.Canonicalizer;
@@ -119,7 +120,8 @@ public class EbicsUtils {
       secureRandom = SecureRandom.getInstance("SHA1PRNG");
       return secureRandom.generateSeed(16);
     } catch (NoSuchAlgorithmException e) {
-      throw new AxelorException(e.getCause(), TraceBackRepository.TYPE_FUNCTIONNAL, e.getMessage());
+      throw new AxelorException(
+          e.getCause(), TraceBackRepository.CATEGORY_INCONSISTENCY, e.getMessage());
     }
   }
 
@@ -149,7 +151,7 @@ public class EbicsUtils {
         count = decompressor.inflate(buf);
       } catch (DataFormatException e) {
         throw new AxelorException(
-            e.getCause(), TraceBackRepository.TYPE_FUNCTIONNAL, e.getMessage());
+            e.getCause(), TraceBackRepository.CATEGORY_INCONSISTENCY, e.getMessage());
       }
       output.write(buf, 0, count);
     }
@@ -157,7 +159,8 @@ public class EbicsUtils {
     try {
       output.close();
     } catch (IOException e) {
-      throw new AxelorException(e.getCause(), TraceBackRepository.TYPE_FUNCTIONNAL, e.getMessage());
+      throw new AxelorException(
+          e.getCause(), TraceBackRepository.CATEGORY_INCONSISTENCY, e.getMessage());
     }
 
     decompressor.end();
@@ -193,6 +196,7 @@ public class EbicsUtils {
 
     try {
       factory = DocumentBuilderFactory.newInstance();
+      factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, Boolean.TRUE);
       factory.setNamespaceAware(true);
       factory.setValidating(true);
       builder = factory.newDocumentBuilder();
@@ -316,7 +320,7 @@ public class EbicsUtils {
   public static void checkHttpCode(int httpCode) throws AxelorException {
     if (httpCode != 200) {
       throw new AxelorException(
-          TraceBackRepository.TYPE_FUNCTIONNAL, "http.code.error[Code:%s]", httpCode);
+          TraceBackRepository.CATEGORY_INCONSISTENCY, "http.code.error[Code:%s]", httpCode);
     }
   }
 }
