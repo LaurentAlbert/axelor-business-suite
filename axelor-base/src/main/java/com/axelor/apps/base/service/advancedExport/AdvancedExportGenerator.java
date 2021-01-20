@@ -99,7 +99,7 @@ public abstract class AdvancedExportGenerator {
 
     log.debug("Export file : {}", getFileName());
 
-    generateHeader();
+    if (advancedExport.getGenerateHeader()) generateHeader();
 
     int startPosition = 0;
     int reachLimit = 0;

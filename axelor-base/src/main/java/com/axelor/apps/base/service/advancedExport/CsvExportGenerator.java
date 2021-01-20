@@ -24,9 +24,7 @@ import com.axelor.exception.db.repo.TraceBackRepository;
 import com.axelor.exception.service.TraceBackService;
 import com.axelor.i18n.I18n;
 import com.opencsv.CSVWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
 import java.math.BigDecimal;
 import java.util.List;
 
@@ -47,7 +45,13 @@ public class CsvExportGenerator extends AdvancedExportGenerator {
     exportFileName = advancedExport.getMetaModel().getName() + ".csv";
     try {
       exportFile = File.createTempFile(advancedExport.getMetaModel().getName(), ".csv");
-      csvWriter = new CSVWriter(new FileWriter(exportFile, true), ';');
+      Writer fstream = null;
+      if (advancedExport.getCharsetName() == null) advancedExport.setCharsetName("UTF-8");
+      fstream =
+          new OutputStreamWriter(new FileOutputStream(exportFile), advancedExport.getCharsetName());
+      if (advancedExport.getNoQuote())
+        csvWriter = new CSVWriter(fstream, ';', CSVWriter.NO_QUOTE_CHARACTER, "\r\n");
+      else csvWriter = new CSVWriter(fstream, ';');
     } catch (IOException e) {
       TraceBackService.trace(e);
       throw new AxelorException(e, TraceBackRepository.CATEGORY_CONFIGURATION_ERROR);
