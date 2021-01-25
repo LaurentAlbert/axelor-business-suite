@@ -25,6 +25,7 @@ import com.axelor.apps.project.db.Project;
 import com.axelor.apps.project.db.ProjectTemplate;
 import com.axelor.apps.project.db.repo.ProjectTemplateRepository;
 import com.axelor.apps.project.service.ProjectService;
+import com.axelor.apps.project.service.ProjectTemplateService;
 import com.axelor.apps.project.service.app.AppProjectService;
 import com.axelor.exception.AxelorException;
 import com.axelor.exception.service.TraceBackService;
@@ -49,6 +50,7 @@ public class ProjectTemplateController {
 
       Project project;
       try {
+        projectTemplate = Beans.get(ProjectTemplateRepository.class).find(projectTemplate.getId());
         project =
             Beans.get(ProjectService.class).createProjectFromTemplate(projectTemplate, null, null);
         response.setView(
@@ -119,5 +121,12 @@ public class ProjectTemplateController {
     } catch (AxelorException e) {
       TraceBackService.trace(response, e);
     }
+  }
+
+  public void addParentTaskTemplate(ActionRequest request, ActionResponse response) {
+    ProjectTemplate projectTemplate = request.getContext().asType(ProjectTemplate.class);
+    projectTemplate =
+        Beans.get(ProjectTemplateService.class).addParentTaskTemplate(projectTemplate);
+    response.setValue("taskTemplateSet", projectTemplate.getTaskTemplateSet());
   }
 }
